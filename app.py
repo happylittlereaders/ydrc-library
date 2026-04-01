@@ -32,7 +32,6 @@ st.markdown("""
     .tag-quiz { background: #6d597a; }
     .tag-il { background: #8888cc; } 
 
-
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
     .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
     .blind-box-container {
@@ -143,7 +142,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Corrected for Column A Offset and Type Conflicts)
+# 4. Data Loading (Fixed for Dtype and Series Errors)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
 
@@ -175,9 +174,11 @@ def load_data():
             errors='coerce'
         ).fillna(0.0)
         
-        # Convert Word Count (Col I) - cleaned to handle the dtype error
+        # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
+        # First convert to string to safely remove any commas/formatting, then back to numeric
+        word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
         df.iloc[:, c['word']] = pd.to_numeric(
-            df.iloc[:, c['word']], 
+            word_col_cleaned, 
             errors='coerce'
         ).fillna(0).astype(int)
         
