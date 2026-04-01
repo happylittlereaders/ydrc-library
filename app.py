@@ -151,9 +151,8 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated Mapping for B-N)
+# 4. Data Loading (Robust Numeric Cleaning)
 # ==========================================
-# IMPORTANT: Ensure sheet is "Published to Web" as CSV for gid 1987014355
 CSV_URL = "https://docs.google.com/spreadsheets/d/1lRDaaeQr14bSbgTnLmWC2WZoRm8OxOO34jt6soI9IxQ/export?format=csv&gid=1987014355"
 
 
@@ -161,38 +160,34 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/1lRDaaeQr14bSbgTnLmWC2WZoRm8Ox
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Mapping for the new structure (Index 0 is Timestamp/Col A)
         c = {
-            "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommended By
-            "title": 3,     # Col D: Book Title
-            "author": 5,    # Col F: Author (E is unused)
-            "quiz": 6,      # Col G: AR Quiz Number
-            "ar": 7,        # Col H: AR Level
-            "word": 8,      # Col I: Word Count
-            "fnf": 9,       # Col J: Fiction/Nonfiction
-            "topic": 10,    # Col K: Topic/Subtopic
-            "series": 11,   # Col L: Series
-            "en": 12,       # Col M: English Recommendation
-            "cn": 13        # Col N: Chinese Recommendation
+            "il": 1, "rec": 2, "title": 3, "author": 5, "quiz": 6,
+            "ar": 7, "word": 8, "fnf": 9, "topic": 10, "series": 11,
+            "en": 12, "cn": 13
         }
+
+        # Helper function to extract digits and handle "N/A" or "32 pages"
+        def clean_to_numeric(val, is_float=False):
+            s = str(val).strip().lower()
+            match = re.search(r'(\d+\.?\d*)', s)
+            if match:
+                return float(match.group(1)) if is_float else int(float(match.group(1)))
+            return 0.0 if is_float else 0
         
-        # Clean AR Level from Col H (Index 7)
-        df.iloc[:, c['ar']] = pd.to_numeric(
-            df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
-            errors='coerce'
-        ).fillna(0.0)
+        # Clean AR Level (Index 7)
+        df.iloc[:, c['ar']] = df.iloc[:, c['ar']].apply(lambda x: clean_to_numeric(x, True))
         
-        # Clean Word Count from Col I (Index 8)
-        df.iloc[:, c['word']] = pd.to_numeric(
-            df.iloc[:, c['word']],
-            errors='coerce'
-        ).fillna(0).astype(int)
+        # Clean Word Count (Index 8)
+        df.iloc[:, c['word']] = df.iloc[:, c['word']].apply(lambda x: clean_to_numeric(x, False))
+        
+        # Ensure Quiz Number (Index 6) is a clean string without decimals
+        df.iloc[:, c['quiz']] = df.iloc[:, c['quiz']].apply(
+            lambda x: str(x).split('.')[0] if '.' in str(x) else str(x)
+        )
         
         return df.fillna(" "), c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
-        st.info("Troubleshooting: Go to File > Share > Publish to web. Choose CSV and the specific tab.")
         return pd.DataFrame(), {}
 
 
