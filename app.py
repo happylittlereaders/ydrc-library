@@ -18,7 +18,7 @@ st.markdown("""
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
-   
+    
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -26,7 +26,11 @@ st.markdown("""
     .tile-title { color: #1e3d59; font-size: 1.1em; font-weight: bold; margin-bottom: 5px; height: 2.8em; overflow: hidden; }
     .tag-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
     .tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; color: white; }
-    .tag-ar { background: #ff6e40; } .tag-word { background: #1e3d59; } .tag-fnf { background: #2a9d8f; } .tag-quiz { background: #6d597a; }
+    .tag-ar { background: #ff6e40; } 
+    .tag-word { background: #1e3d59; } 
+    .tag-fnf { background: #2a9d8f; } 
+    .tag-quiz { background: #6d597a; }
+    .tag-il { background: #8888cc; } /* New Interest Level Tag Color */
 
 
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
@@ -36,7 +40,7 @@ st.markdown("""
         text-align: center; box-shadow: 0 10px 25px rgba(255,110,64,0.15); margin: 15px 0;
     }
     .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-   
+    
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
@@ -93,7 +97,7 @@ def get_user_role(email):
     # Owner email configured in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
-   
+    
     doc = db.collection("users").document(email).get()
     if doc.exists:
         return doc.to_dict().get("role", "user")
@@ -107,9 +111,9 @@ def register_user(email, password, nickname):
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
-       
+        
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
-       
+        
         doc_ref.set({
             "email": email,
             "password": make_hash(password),
@@ -130,7 +134,7 @@ def login_user(email, password):
         doc = db.collection("users").document(email).get()
         if doc.exists:
             user_data = doc.to_dict()
-            # Fix 1: Prevent crash if password field is missing in DB
+            # Prevent crash if password field is missing in DB
             if check_hashes(password, user_data.get('password', '')):
                 return user_data
             else:
@@ -167,19 +171,19 @@ def load_data():
             "topic": 15,    # Col P: Topic-Subtopic
             "series": 16    # Col Q: Series
         }
-       
+        
         # Data Cleaning: Extract AR numbers from Col F (index 5)
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
-       
+        
         # Convert word count from Col I (index 8) to integers
         df.iloc[:, c['word']] = pd.to_numeric(
             df.iloc[:, c['word']],
             errors='coerce'
         ).fillna(0).astype(int)
-       
+        
         return df.fillna(" "), c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
@@ -212,12 +216,12 @@ for key, val in state_keys.items():
 with st.sidebar:
     try: st.image("YDRC-logo.png", use_container_width=True)
     except: pass
-   
+    
     st.markdown("### 👤 User Center")
-   
+    
     if not st.session_state.logged_in:
         auth_mode = st.tabs(["Login", "Register"])
-       
+        
         with auth_mode[0]: # Login
             l_email = st.text_input("Email", key="l_email")
             l_pass = st.text_input("Password", type="password", key="l_pass")
@@ -225,7 +229,7 @@ with st.sidebar:
                 user_info = login_user(l_email, l_pass)
                 if user_info:
                     st.session_state.logged_in = True
-                    # Fix 2: Prevent KeyError: 'email'
+                    # Prevent KeyError: 'email'
                     st.session_state.user_email = user_info.get('email', l_email)
                     st.session_state.user_nickname = user_info.get('nickname', 'User')
                     st.session_state.user_role = get_user_role(st.session_state.user_email)
@@ -242,7 +246,7 @@ with st.sidebar:
                         register_user(r_email, r_pass, r_nick)
                     else: st.warning("Password must be at least 6 characters.")
                 else: st.warning("Please enter a valid email.")
-           
+            
             # --- Password Reset Functionality ---
             st.write("---")
             with st.expander("🔑 Forgot/Reset Password"):
@@ -267,7 +271,7 @@ with st.sidebar:
         <div class='user-badge {role_cls}'>{role_badges.get(st.session_state.user_role, 'Guest')}</div>
         <div style='font-size:1.2em'>Hello, <b>{st.session_state.user_nickname}</b></div>
         """, unsafe_allow_html=True)
-       
+        
         if st.button("👋 Log Out"):
             st.session_state.logged_in = False
             st.session_state.user_email = None
@@ -345,13 +349,13 @@ def delete_comment(comment_id):
 if st.session_state.bk_focus is not None:
     row = df.iloc[st.session_state.bk_focus]
     title_key = str(row.iloc[idx['title']])
-   
+    
     if st.button("⬅️ Back to Library"):
         st.session_state.bk_focus = None
         st.rerun()
-   
+    
     st.markdown(f"# 📖 {title_key}")
-   
+    
     # Info Cards
     c1, c2, c3 = st.columns(3)
     infos = [
@@ -367,7 +371,7 @@ if st.session_state.bk_focus is not None:
     lb1, lb2, _ = st.columns([1,1,2])
     if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
-   
+    
     # Toggle content language
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
@@ -375,14 +379,14 @@ if st.session_state.bk_focus is not None:
 
     st.markdown("---")
     st.subheader("💬 Comment Area")
-   
+    
     # Load comments
     cloud_comments = load_db_comments(title_key)
-   
+    
     for i, m in enumerate(cloud_comments):
         is_mine = m.get('author_email') == st.session_state.user_email
         is_admin = st.session_state.user_role in ['admin', 'owner']
-       
+        
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-meta">
@@ -392,9 +396,9 @@ if st.session_state.bk_focus is not None:
             {m.get('text')}
         </div>
         """, unsafe_allow_html=True)
-       
+        
         col_ops = st.columns([1, 1, 8])
-       
+        
         # Edit Button (Owner of comment only)
         if st.session_state.logged_in and is_mine and st.session_state.edit_id is None:
             if col_ops[0].button("✏️", key=f"edit_{i}", help="Edit comment"):
@@ -403,7 +407,7 @@ if st.session_state.bk_focus is not None:
                 st.session_state.temp_comment = m["text"]
                 st.session_state.form_version += 1
                 st.rerun()
-       
+        
         # Delete Button (Owner or Admin)
         if st.session_state.logged_in and (is_mine or is_admin) and st.session_state.edit_id is None:
              if col_ops[1].button("🗑️", key=f"del_{i}", help="Delete comment"):
@@ -415,11 +419,11 @@ if st.session_state.bk_focus is not None:
     if st.session_state.logged_in:
         is_editing = st.session_state.edit_id is not None
         input_key = f"input_area_v{st.session_state.form_version}"
-       
+        
         with st.form("comment_form", clear_on_submit=False):
             st.write("✍️ " + ("Edit Comment" if is_editing else f"Post Comment (as {st.session_state.user_nickname})"))
             user_input = st.text_area("Content", value=st.session_state.temp_comment, key=input_key)
-           
+            
             cb1, cb2, _ = st.columns([1, 1, 4])
             if cb1.form_submit_button("Post" if not is_editing else "Save"):
                 if user_input.strip():
@@ -430,7 +434,7 @@ if st.session_state.bk_focus is not None:
                     st.session_state.form_version += 1
                     st.rerun()
                 else: st.warning("Content cannot be empty.")
-           
+            
             if is_editing and cb2.form_submit_button("❌ Cancel"):
                 st.session_state.edit_id = None; st.session_state.edit_doc_id = None
                 st.session_state.temp_comment = ""; st.session_state.form_version += 1
@@ -474,12 +478,12 @@ elif not df.empty:
 
 
     tab1, tab2, tab3 = st.tabs(["📚 Book Gallery", "📊 Level Distribution", "🏆 Top Rated"])
-   
+    
     with tab1:
         if st.button("🎁 Open Mystery Book Blind Box", use_container_width=True):
             st.balloons()
             st.session_state.blind_idx = f_df.sample(1).index[0] if not f_df.empty else df.sample(1).index[0]
-       
+        
         if st.session_state.blind_idx is not None:
             b_row = df.iloc[st.session_state.blind_idx]
             _, b_col, _ = st.columns([1, 2, 1])
@@ -503,18 +507,19 @@ elif not df.empty:
                         <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
                         <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
                         <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
+                        <span class="tag tag-il">{row.iloc[idx["il"]]}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-               
+                
                 cl, cr = st.columns(2)
-               
+                
                 # Like button (available to all users including guests)
                 if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
                     if voted: st.session_state.voted.remove(t)
                     else: st.session_state.voted.add(t)
                     st.rerun()
-               
+                
                 if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                     st.session_state.bk_focus = orig_idx; st.rerun()
 
