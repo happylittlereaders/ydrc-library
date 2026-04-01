@@ -23,40 +23,36 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
 
-    /* 2. THE GITHUB & DEPLOY REMOVER */
-    /* Hides the deploy button, the help menu, and any links (GitHub) in the header */
-    [data-testid="stHeader"] .stAppDeployButton, 
-    [data-testid="stHeader"] a, 
-    [data-testid="stHeader"] button:not([data-testid="stSidebarCollapsedControl"]) {
+    /* 2. THE SURGICAL HEADER CLEANER */
+    /* Hide the GitHub icon (the anchor tag) */
+    header[data-testid="stHeader"] a {
         display: none !important;
     }
     
-    /* Ensure the header bar itself doesn't disappear so the sidebar toggle stays */
-    header[data-testid="stHeader"] {
-        background-color: rgba(0,0,0,0) !important;
-        color: #1e3d59 !important;
+    /* Hide the Deploy button and Help menu, but EXEMPT the sidebar toggle */
+    header[data-testid="stHeader"] button:not([data-testid="stSidebarCollapsedControl"]) {
+        display: none !important;
     }
 
-    /* 3. FIX SIDEBAR TOGGLE (The '>' and 'X' buttons) */
-    /* This makes sure the "bring back" arrow is visible and easy to click */
-    [data-testid="stSidebarCollapsedControl"] {
+    /* 3. FORCE SIDEBAR TOGGLE VISIBILITY */
+    /* This targets both the 'X' (close) and '>' (open) buttons */
+    [data-testid="stSidebarCollapsedControl"], 
+    button[kind="headerNoFrame"] {
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
-        background-color: #f0f2f6 !important;
-        border-radius: 0 10px 10px 0 !important;
+        color: #1e3d59 !important; /* Dark blue so you can see it */
     }
 
-    /* 4. HIDE FOOTER & SYSTEM BADGES */
+    /* 4. HIDE FOOTER & SYSTEM DECORATION */
     [data-testid="stStatusWidget"],
     [data-testid="stAppViewBlockContainer"] > section:last-child,
-    iframe[title="Managed Viewport"],
     footer, 
     [data-testid="stDecoration"] {
         display: none !important;
     }
 
-    /* 5. Book Tile Styling */
+    /* 5. UI Component Styling */
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -68,10 +64,6 @@ st.markdown("""
     
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
     .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
-    .blind-box-container {
-        background: white; border: 4px solid #ff6e40; border-radius: 20px; padding: 30px;
-        text-align: center; box-shadow: 0 10px 25px rgba(255,110,64,0.15); margin: 15px 0;
-    }
     .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
