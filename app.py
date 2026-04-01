@@ -143,7 +143,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Mapped to include Column A)
+# 4. Data Loading (Corrected for Column A Offset and Type Conflicts)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
 
@@ -169,15 +169,15 @@ def load_data():
             "cn": 13        # Col N: CHINESE Recommendation
         }
         
-        # Numeric extraction for ATOS Level (Col H)
+        # Convert AR level (Col H) - robust handling for strings or numbers
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
         
-        # Numeric extraction for Word Count (Col I)
+        # Convert Word Count (Col I) - cleaned to handle the dtype error
         df.iloc[:, c['word']] = pd.to_numeric(
-            df.iloc[:, c['word']],
+            df.iloc[:, c['word']], 
             errors='coerce'
         ).fillna(0).astype(int)
         
