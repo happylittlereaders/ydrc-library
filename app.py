@@ -42,6 +42,29 @@ st.markdown("""
     .badge-admin { background-color: #ff6e40; color: #fff; }
     .badge-user { background-color: #2a9d8f; color: #fff; }
     .badge-guest { background-color: #ccc; color: #555; }
+            
+     /* 1. Hides the top toolbar (Deploy, GitHub, Light/Dark) */
+       [data-testid="stToolbar"], 
+       [data-testid="stDecoration"],
+       header {
+           display: none !important;
+           visibility: hidden !important;
+       }
+        /* 2. Hides the 'Created by' badge and the hover profile */
+       [data-testid="stStatusWidget"],
+       .stAppDeployButton,
+       [data-testid="stAppViewBlockContainer"] > section:last-child {
+           display: none !important;
+       }
+        /* 3. The 'Nuclear Option' for the profile pop-over */
+       iframe[title="Managed Viewport"], 
+       div[class^="st-emotion-cache-"] + div[style*="position: fixed"] {
+           display: none !important;
+       }
+        /* 4. Hides the 'Made with Streamlit' footer */
+       footer {
+           display: none !important;
+       }
     </style>
 """, unsafe_allow_html=True)
 
