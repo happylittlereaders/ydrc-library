@@ -143,9 +143,9 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated for new Column B-Q structure)
+# 4. Data Loading (Updated for new Column B-N structure)
 # ==========================================
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6dfsUdo7SbnqVnWvdP_kqe63PkSL8ni7bH6r6c86MLUtf_q58r0gI2Ft2460/pub?output=csv"
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
 
 
 @st.cache_data(ttl=600)
@@ -153,18 +153,18 @@ def load_data():
     try:
         df = pd.read_csv(CSV_URL)
         c = {
-            "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommender
-            "title": 3,     # Col D: Title
-            "author": 4,    # Col E: Author
-            "ar": 5,        # Col F: ATOS Level
-            "quiz": 7,      # Col H: Quiz No
-            "word": 8,      # Col I: Word Count
-            "en": 10,       # Col K: English Recommendation Reason
-            "cn": 12,       # Col M: Chinese Recommendation Reason
-            "fnf": 14,      # Col O: Fiction/Nonfiction
-            "topic": 15,    # Col P: Topic-Subtopic
-            "series": 16    # Col Q: Series
+            "il": 0,        # Col B: Interest Level
+            "rec": 1,       # Col C: Recommender
+            "title": 2,     # Col D: Title
+            "author": 4,    # Col F: Author
+            "quiz": 5,      # Col G: Quiz No
+            "ar": 6,        # Col H: ATOS Level
+            "word": 7,      # Col I: Word Count
+            "fnf": 8,       # Col J: Fiction/Nonfiction
+            "topic": 9,     # Col K: Topic-Subtopic
+            "series": 10,   # Col L: Series
+            "en": 11,       # Col M: English Recommendation Reason
+            "cn": 12        # Col N: Chinese Recommendation Reason
         }
         
         df.iloc[:, c['ar']] = pd.to_numeric(
