@@ -18,29 +18,36 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* 1. Basic Colors */
+    /* 1. Basic Colors & Layout */
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
 
-    /* 2. HIDE GITHUB & DEPLOY (Surgical Strike) */
-    .stAppDeployButton, 
-    header [data-testid="stHeader"] a, 
-    header [data-testid="stHeader"] .st-emotion-cache-1it3461 {
+    /* 2. THE GITHUB & DEPLOY REMOVER */
+    /* Hides the deploy button, the help menu, and any links (GitHub) in the header */
+    [data-testid="stHeader"] .stAppDeployButton, 
+    [data-testid="stHeader"] a, 
+    [data-testid="stHeader"] button:not([data-testid="stSidebarCollapsedControl"]) {
         display: none !important;
     }
-
-    /* 3. FIX SIDEBAR TOGGLE (The '>' and 'X' buttons) */
-    /* Forces the toggle to be visible and correctly colored */
-    [data-testid="stSidebarCollapsedControl"], 
-    button[kind="headerNoFrame"] {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+    
+    /* Ensure the header bar itself doesn't disappear so the sidebar toggle stays */
+    header[data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important;
         color: #1e3d59 !important;
     }
 
-    /* 4. HIDE FOOTER & BADGES */
+    /* 3. FIX SIDEBAR TOGGLE (The '>' and 'X' buttons) */
+    /* This makes sure the "bring back" arrow is visible and easy to click */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background-color: #f0f2f6 !important;
+        border-radius: 0 10px 10px 0 !important;
+    }
+
+    /* 4. HIDE FOOTER & SYSTEM BADGES */
     [data-testid="stStatusWidget"],
     [data-testid="stAppViewBlockContainer"] > section:last-child,
     iframe[title="Managed Viewport"],
