@@ -78,10 +78,12 @@ def make_hash(password):
 
 
 def check_hashes(password, hashed_text):
+    """Verify password hash"""
     return make_hash(password) == hashed_text
 
 
 def validate_email(email):
+    """Simple regex for email validation"""
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
 
@@ -92,7 +94,7 @@ def validate_email(email):
 
 
 def get_user_role(email):
-    """Retrieve user role"""
+    """Retrieve user role from Firestore"""
     if db is None: return "guest"
     # Owner email configured in secrets
     if email == st.secrets.get("owner_email", ""):
@@ -105,6 +107,7 @@ def get_user_role(email):
 
 
 def register_user(email, password, nickname):
+    """Register a new user in Firestore"""
     if db is None: return False
     try:
         doc_ref = db.collection("users").document(email)
@@ -129,6 +132,7 @@ def register_user(email, password, nickname):
 
 
 def login_user(email, password):
+    """Verify user credentials"""
     if db is None: return None
     try:
         doc = db.collection("users").document(email).get()
@@ -147,32 +151,33 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated for new Column B-Q structure)
+# 4. Data Loading (Updated for NEW GSheet Link)
 # ==========================================
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6dfsUdo7SbnqVnWvdP_kqe63PkSL8ni7bH6r6c86MLUtf_q58r0gI2Ft2460/pub?output=csv"
+# New Spreadsheet Link Integrated
+CSV_URL = "https://docs.google.com/spreadsheets/d/1lRDaaeQr14bSbgTnLmWC2WZoRm8OxOO34jt6soI9IxQ/export?format=csv&gid=1987014355"
 
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Updated column mapping (0-indexed: A=0, B=1, C=2...)
+        # Updated column mapping based on your requirements (0-indexed: A=0, B=1, C=2...)
         c = {
             "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommender
-            "title": 3,     # Col D: Title
-            "author": 4,    # Col E: Author
-            "ar": 5,        # Col F: ATOS Level
-            "quiz": 7,      # Col H: Quiz No
+            "rec": 2,       # Col C: Recommended By
+            "title": 3,     # Col D: Book Title
+            "author": 5,    # Col F: Author
+            "quiz": 6,      # Col G: AR Quiz Number
+            "ar": 7,        # Col H: AR Level
             "word": 8,      # Col I: Word Count
-            "en": 10,       # Col K: English Recommendation Reason
-            "cn": 12,       # Col M: Chinese Recommendation Reason
-            "fnf": 14,      # Col O: Fiction/Nonfiction
-            "topic": 15,    # Col P: Topic-Subtopic
-            "series": 16    # Col Q: Series
+            "fnf": 9,       # Col J: Fiction/Nonfiction
+            "topic": 10,    # Col K: Topic/Subtopic
+            "series": 11,   # Col L: Series
+            "en": 12,       # Col M: English Recommendation
+            "cn": 13        # Col N: Chinese Recommendation
         }
         
-        # Data Cleaning: Extract AR numbers from Col F (index 5)
+        # Data Cleaning: Extract AR numbers from Col H (index 7)
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
@@ -229,7 +234,6 @@ with st.sidebar:
                 user_info = login_user(l_email, l_pass)
                 if user_info:
                     st.session_state.logged_in = True
-                    # Prevent KeyError: 'email'
                     st.session_state.user_email = user_info.get('email', l_email)
                     st.session_state.user_nickname = user_info.get('nickname', 'User')
                     st.session_state.user_role = get_user_role(st.session_state.user_email)
@@ -247,7 +251,7 @@ with st.sidebar:
                     else: st.warning("Password must be at least 6 characters.")
                 else: st.warning("Please enter a valid email.")
             
-            # --- Password Reset Functionality ---
+            # --- Password Reset Functionality (Full Restored) ---
             st.write("---")
             with st.expander("🔑 Forgot/Reset Password"):
                 st.caption("Verify Project ID to reset account")
@@ -304,6 +308,7 @@ with st.sidebar:
 
 
 def load_db_comments(book_title):
+    """Retrieve comments from Firestore for a specific book"""
     if db is None: return []
     try:
         col_ref = db.collection("comments").where("book", "==", book_title)
@@ -315,6 +320,7 @@ def load_db_comments(book_title):
 
 
 def save_db_comment(book_title, text, comment_id=None):
+    """Save or update a comment in Firestore"""
     if db is None: return
     data = {
         "book": book_title,
@@ -335,6 +341,7 @@ def save_db_comment(book_title, text, comment_id=None):
 
 
 def delete_comment(comment_id):
+    """Delete a comment from Firestore"""
     if db:
         try:
             db.collection("comments").document(comment_id).delete()
@@ -360,7 +367,7 @@ if st.session_state.bk_focus is not None:
     c1, c2, c3 = st.columns(3)
     infos = [
         ("👤 Author", row.iloc[idx['author']]), ("📚 Genre", row.iloc[idx['fnf']]), ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 ATOS Book Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
+        ("📊 AR Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
         ("🔗 Series", row.iloc[idx['series']]), ("🏷️ Topic", row.iloc[idx['topic']]), ("🙋 Recommender", row.iloc[idx['rec']])
     ]
     for i, (l, v) in enumerate(infos):
@@ -460,7 +467,7 @@ elif not df.empty:
         f_series = st.text_input("🔗 Series")
         f_topic = st.text_input("🏷️ Topic")
         st.write("---")
-        f_ar = st.slider("📊 ATOS Book Level Range", 0.0, 12.0, (0.0, 12.0))
+        f_ar = st.slider("📊 AR Level Range", 0.0, 12.0, (0.0, 12.0))
 
 
     # Filter Logic
@@ -503,7 +510,7 @@ elif not df.empty:
                     <div class="tile-title">《{t}》</div>
                     <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
                     <div class="tag-container">
-                        <span class="tag tag-ar">ATOS {row.iloc[idx["ar"]]}</span>
+                        <span class="tag tag-ar">AR {row.iloc[idx["ar"]]}</span>
                         <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
                         <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
                         <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
@@ -525,7 +532,7 @@ elif not df.empty:
 
 
     with tab2:
-        st.subheader("📊 ATOS Book Level Distribution")
+        st.subheader("📊 AR Level Distribution")
         if not f_df.empty:
             st.bar_chart(f_df.iloc[:, idx['ar']].value_counts().sort_index())
 
