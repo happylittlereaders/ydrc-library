@@ -143,7 +143,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Google Sheets)
+# 4. Data Loading (Updated for new Column B-Q structure)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6dfsUdo7SbnqVnWvdP_kqe63PkSL8ni7bH6r6c86MLUtf_q58r0gI2Ft2460/pub?output=csv"
 
@@ -152,29 +152,29 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6d
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Column mapping (0-indexed)
+        # Updated column mapping (0-indexed: A=0, B=1, C=2...)
         c = {
             "il": 1,        # Col B: Interest Level
             "rec": 2,       # Col C: Recommender
-            "title": 3,      # Col D: Title
+            "title": 3,     # Col D: Title
             "author": 4,    # Col E: Author
-            "ar": 5,        # Col F: ATOS
+            "ar": 5,        # Col F: ATOS Level
             "quiz": 7,      # Col H: Quiz No
             "word": 8,      # Col I: Word Count
             "en": 10,       # Col K: English Recommendation Reason
             "cn": 12,       # Col M: Chinese Recommendation Reason
             "fnf": 14,      # Col O: Fiction/Nonfiction
-            "topic": 15,    # Col P: Topic
+            "topic": 15,    # Col P: Topic-Subtopic
             "series": 16    # Col Q: Series
         }
        
-        # Data Cleaning: Extract AR numbers
+        # Data Cleaning: Extract AR numbers from Col F (index 5)
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
        
-        # Convert word count to integers
+        # Convert word count from Col I (index 8) to integers
         df.iloc[:, c['word']] = pd.to_numeric(
             df.iloc[:, c['word']],
             errors='coerce'
