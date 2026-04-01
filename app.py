@@ -30,7 +30,7 @@ st.markdown("""
     .tag-word { background: #1e3d59; } 
     .tag-fnf { background: #2a9d8f; } 
     .tag-quiz { background: #6d597a; }
-    .tag-il { background: #8888cc; }
+    .tag-il { background: #8888cc; } /* New Interest Level Tag Color */
 
 
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
@@ -143,39 +143,35 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated for new Link & Column Structure)
+# 4. Data Loading (Updated for new Column B-Q structure)
 # ==========================================
-# New Spreadsheet Link: https://docs.google.com/spreadsheets/d/1lRDaaeQr14bSbgTnLmWC2WZoRm8OxOO34jt6soI9IxQ/
-CSV_URL = "https://docs.google.com/spreadsheets/d/1lRDaaeQr14bSbgTnLmWC2WZoRm8OxOO34jt6soI9IxQ/export?format=csv&gid=1987014355"
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6dfsUdo7SbnqVnWvdP_kqe63PkSL8ni7bH6r6c86MLUtf_q58r0gI2Ft2460/pub?output=csv"
 
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Updated column mapping based on your requirements (0-indexed)
         c = {
             "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommended By
-            "title": 3,     # Col D: Book Title
-            "author": 5,    # Col F: Author
-            "quiz": 6,      # Col G: AR Quiz Number
-            "ar": 7,        # Col H: AR Level
+            "rec": 2,       # Col C: Recommender
+            "title": 3,     # Col D: Title
+            "author": 4,    # Col E: Author
+            "ar": 5,        # Col F: ATOS Level
+            "quiz": 7,      # Col H: Quiz No
             "word": 8,      # Col I: Word Count
-            "fnf": 9,       # Col J: Fiction/Nonfiction
-            "topic": 10,    # Col K: Topic/Subtopic
-            "series": 11,   # Col L: Series
-            "en": 12,       # Col M: English Recommendation
-            "cn": 13        # Col N: Chinese Recommendation
+            "en": 10,       # Col K: English Recommendation Reason
+            "cn": 12,       # Col M: Chinese Recommendation Reason
+            "fnf": 14,      # Col O: Fiction/Nonfiction
+            "topic": 15,    # Col P: Topic-Subtopic
+            "series": 16    # Col Q: Series
         }
         
-        # Clean AR Level from Col H
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
         
-        # Clean Word Count from Col I
         df.iloc[:, c['word']] = pd.to_numeric(
             df.iloc[:, c['word']],
             errors='coerce'
@@ -207,7 +203,7 @@ for key, val in state_keys.items():
 
 
 # ==========================================
-# 6. Sidebar: User Center & Filters
+# 6. Sidebar: Login/Register/Management
 # ==========================================
 with st.sidebar:
     try: st.image("YDRC-logo.png", use_container_width=True)
@@ -308,8 +304,7 @@ def load_db_comments(book_title):
 def save_db_comment(book_title, text, comment_id=None):
     if db is None: return
     data = {
-        "book": book_title,
-        "text": text,
+        "book": book_title, "text": text,
         "author_email": st.session_state.user_email,
         "author_nick": st.session_state.user_nickname,
         "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -347,11 +342,10 @@ if st.session_state.bk_focus is not None:
     
     st.markdown(f"# 📖 {title_key}")
     
-    # Info Cards
     c1, c2, c3 = st.columns(3)
     infos = [
         ("👤 Author", row.iloc[idx['author']]), ("📚 Genre", row.iloc[idx['fnf']]), ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 AR Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
+        ("📊 ATOS Book Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
         ("🔗 Series", row.iloc[idx['series']]), ("🏷️ Topic", row.iloc[idx['topic']]), ("🙋 Recommender", row.iloc[idx['rec']])
     ]
     for i, (l, v) in enumerate(infos):
@@ -369,7 +363,6 @@ if st.session_state.bk_focus is not None:
 
     st.markdown("---")
     st.subheader("💬 Comment Area")
-    
     cloud_comments = load_db_comments(title_key)
     
     for i, m in enumerate(cloud_comments):
@@ -413,7 +406,7 @@ if st.session_state.bk_focus is not None:
 
 
 # ==========================================
-# 9. Main Gallery View
+# 9. Main View
 # ==========================================
 elif not df.empty:
     with st.sidebar:
@@ -429,13 +422,11 @@ elif not df.empty:
         f_series = st.text_input("🔗 Series")
         f_topic = st.text_input("🏷️ Topic")
         st.write("---")
-        f_ar = st.slider("📊 AR Level Range", 0.0, 12.0, (0.0, 12.0))
+        f_ar = st.slider("📊 ATOS Book Level Range", 0.0, 12.0, (0.0, 12.0))
 
 
-    # Filter Logic
     f_df = df.copy()
-    if f_fuzzy:
-        f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+    if f_fuzzy: f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
     if f_author: f_df = f_df[f_df.iloc[:, idx['author']].astype(str).str.contains(f_author, case=False)]
     if f_fnf != "All": f_df = f_df[f_df.iloc[:, idx['fnf']] == f_fnf]
@@ -472,7 +463,7 @@ elif not df.empty:
                     <div class="tile-title">《{t}》</div>
                     <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
                     <div class="tag-container">
-                        <span class="tag tag-ar">AR {row.iloc[idx["ar"]]}</span>
+                        <span class="tag tag-ar">ATOS {row.iloc[idx["ar"]]}</span>
                         <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
                         <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
                         <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
@@ -492,7 +483,7 @@ elif not df.empty:
 
 
     with tab2:
-        st.subheader("📊 AR Level Distribution")
+        st.subheader("📊 ATOS Book Level Distribution")
         if not f_df.empty:
             st.bar_chart(f_df.iloc[:, idx['ar']].value_counts().sort_index())
 
