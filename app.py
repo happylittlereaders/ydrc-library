@@ -67,7 +67,7 @@ def get_db_client():
         return firestore.Client(
             credentials=creds, 
             project=key_dict["project_id"].strip(), 
-            database="(default)"  # Parentheses are required for the primary DB
+            database="default" 
         )
     except Exception as e:
         st.error(f"❌ Database Connection Error: {e}")
