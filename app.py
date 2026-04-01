@@ -6,7 +6,6 @@ from google.oauth2 import service_account
 import hashlib
 import re
 
-
 # ==========================================
 # 1. Styles and Configuration
 # ==========================================
@@ -14,15 +13,43 @@ st.set_page_config(
     page_title="Smart Library · Flagship Edition", 
     layout="wide", 
     page_icon="📚",
-    initial_sidebar_state="expanded" # This ensures it's open when the user first arrives
+    initial_sidebar_state="expanded" 
 )
 
 st.markdown("""
     <style>
+    /* 1. Basic Colors */
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
-    
+
+    /* 2. HIDE GITHUB & DEPLOY (Surgical Strike) */
+    .stAppDeployButton, 
+    header [data-testid="stHeader"] a, 
+    header [data-testid="stHeader"] .st-emotion-cache-1it3461 {
+        display: none !important;
+    }
+
+    /* 3. FIX SIDEBAR TOGGLE (The '>' and 'X' buttons) */
+    /* Forces the toggle to be visible and correctly colored */
+    [data-testid="stSidebarCollapsedControl"], 
+    button[kind="headerNoFrame"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        color: #1e3d59 !important;
+    }
+
+    /* 4. HIDE FOOTER & BADGES */
+    [data-testid="stStatusWidget"],
+    [data-testid="stAppViewBlockContainer"] > section:last-child,
+    iframe[title="Managed Viewport"],
+    footer, 
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+
+    /* 5. Book Tile Styling */
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -31,7 +58,7 @@ st.markdown("""
     .tag-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
     .tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; color: white; }
     .tag-ar { background: #ff6e40; } .tag-word { background: #1e3d59; } .tag-fnf { background: #2a9d8f; } .tag-quiz { background: #6d597a; }
-
+    
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
     .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
     .blind-box-container {
@@ -45,33 +72,6 @@ st.markdown("""
     .badge-admin { background-color: #ff6e40; color: #fff; }
     .badge-user { background-color: #2a9d8f; color: #fff; }
     .badge-guest { background-color: #ccc; color: #555; }
-
-    /* --- THE SMART UI CLEANUP --- */
-
-    /* 1. Hide Deploy Button and GitHub/Links, but leave the Header bar for Toggle/Sidebar Arrow */
-    .stAppDeployButton, 
-    header [data-testid="stHeader"] a {
-        display: none !important;
-    }
-
-    /* 2. Style the Sidebar Arrow so it's visible on your cream background */
-    [data-testid="stSidebarCollapsedControl"] {
-        background-color: #f0f2f6 !important;
-        border-radius: 0 10px 10px 0 !important;
-        left: 0 !important;
-    }
-
-    /* 3. Hide the 'Created by' badge and status widget */
-    [data-testid="stStatusWidget"],
-    [data-testid="stAppViewBlockContainer"] > section:last-child,
-    iframe[title="Managed Viewport"] {
-        display: none !important;
-    }
-
-    /* 4. Hide the 'Made with Streamlit' footer and the colored top decoration */
-    footer, [data-testid="stDecoration"] {
-        display: none !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
