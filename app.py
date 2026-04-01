@@ -154,7 +154,7 @@ def login_user(email, password):
 # 4. Data Loading (Updated Mapping for B-N)
 # ==========================================
 # IMPORTANT: Ensure sheet is "Published to Web" as CSV for gid 1987014355
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
+CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?output=csv"
 
 
 @st.cache_data(ttl=600)
