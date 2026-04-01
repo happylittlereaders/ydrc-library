@@ -9,7 +9,10 @@ import re
 # ==========================================
 # 1. Styles and Configuration
 # ==========================================
-st.set_page_config(page_title="Smart Library · Flagship Edition", layout="wide", page_icon="📚")
+# ==========================================
+# 1. Styles and Configuration
+# ==========================================
+st.set_page_config(page_title="Smart Library - Flagship Edition", layout="wide", page_icon="📚")
 
 st.markdown("""
     <style>
@@ -38,7 +41,19 @@ st.markdown("""
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
     .badge-user { background-color: #2a9d8f; color: #fff; }
-    .badge-guest { background-color: #ccc; color: #555; }
+    .badge-guest { background-color: #ccc; color: #555; }       
+        /* code removes steamlit stuff */
+        [data-testid="stDecoration"], 
+        [data-testid="stStatusWidget"], 
+        [data-testid="stToolbar"],
+        .stAppDeployButton {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        footer {
+            display: none !important;
+        }
+
     </style>
 """, unsafe_allow_html=True)
 
