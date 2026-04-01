@@ -53,30 +53,35 @@ st.markdown("""
 # 2. Database and Security Tools
 # ==========================================
 
-
 @st.cache_resource
 def get_db_client():
     """Connect to Firestore Database"""
     try:
+        # Pull the dictionary from Streamlit Secrets
         key_dict = st.secrets["firestore"]
+        
+        # Create credentials from the dictionary
         creds = service_account.Credentials.from_service_account_info(key_dict)
-        return firestore.Client(credentials=creds, project=key_dict["project_id"])
+        
+        # Initialize the client with explicit project and database ID
+        return firestore.Client(
+            credentials=creds, 
+            project=key_dict["project_id"].strip(), 
+            database="(default)"  # Parentheses are required for the primary DB
+        )
     except Exception as e:
-        st.error(f"Database Connection Hint: {e}")
+        st.error(f"❌ Database Connection Error: {e}")
         return None
 
-
+# Global database instance
 db = get_db_client()
-
 
 def make_hash(password):
     """Simple password hashing"""
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-
 def check_hashes(password, hashed_text):
     return make_hash(password) == hashed_text
-
 
 def validate_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -87,27 +92,40 @@ def validate_email(email):
 # 3. User Permission Management Logic
 # ==========================================
 
-
 def get_user_role(email):
     """Retrieve user role"""
-    if db is None: return "guest"
+    if db is None: 
+        return "guest"
+    
+    # Check if this is the owner email defined in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
     
-    doc = db.collection("users").document(email).get()
-    if doc.exists:
-        return doc.to_dict().get("role", "user")
+    try:
+        doc = db.collection("users").document(email).get()
+        if doc.exists:
+            return doc.to_dict().get("role", "user")
+    except Exception:
+        pass
     return "guest"
 
-
 def register_user(email, password, nickname):
-    if db is None: return False
+    if db is None: 
+        st.error("Database not connected.")
+        return False
+        
+    # Basic validation to prevent empty documents (like in your screenshot)
+    if not email or not password or not nickname:
+        st.error("All fields are required for registration.")
+        return False
+
     try:
         doc_ref = db.collection("users").document(email)
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
         
+        # Determine role based on owner email
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
         
         doc_ref.set({
@@ -123,9 +141,15 @@ def register_user(email, password, nickname):
         st.error(f"Registration failed: {e}")
         return False
 
-
 def login_user(email, password):
-    if db is None: return None
+    if db is None: 
+        st.error("Database connection is down.")
+        return None
+        
+    if not email or not password:
+        st.error("Please enter both email and password.")
+        return None
+
     try:
         doc = db.collection("users").document(email).get()
         if doc.exists:
@@ -137,9 +161,9 @@ def login_user(email, password):
         else:
             st.error("User does not exist.")
     except Exception as e:
+        # This will catch the 404 if the project/database ID is still wrong
         st.error(f"Login error: {e}")
     return None
-
 
 # ==========================================
 # 4. Data Loading (Fixed for Dtype and Series Errors)
