@@ -18,7 +18,7 @@ st.markdown("""
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
-   
+    
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -36,7 +36,7 @@ st.markdown("""
         text-align: center; box-shadow: 0 10px 25px rgba(255,110,64,0.15); margin: 15px 0;
     }
     .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-   
+    
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
@@ -55,12 +55,10 @@ st.markdown("""
 def get_db_client():
     """Connect to Firestore Database"""
     try:
-        # Firestore info must be configured in .streamlit/secrets.toml
         key_dict = st.secrets["firestore"]
         creds = service_account.Credentials.from_service_account_info(key_dict)
         return firestore.Client(credentials=creds, project=key_dict["project_id"])
     except Exception as e:
-        # Avoid crashing during local testing if secrets are missing
         st.error(f"Database Connection Hint: {e}")
         return None
 
@@ -90,10 +88,9 @@ def validate_email(email):
 def get_user_role(email):
     """Retrieve user role"""
     if db is None: return "guest"
-    # Owner email configured in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
-   
+    
     doc = db.collection("users").document(email).get()
     if doc.exists:
         return doc.to_dict().get("role", "user")
@@ -107,9 +104,9 @@ def register_user(email, password, nickname):
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
-       
+        
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
-       
+        
         doc_ref.set({
             "email": email,
             "password": make_hash(password),
@@ -130,7 +127,6 @@ def login_user(email, password):
         doc = db.collection("users").document(email).get()
         if doc.exists:
             user_data = doc.to_dict()
-            # Fix 1: Prevent crash if password field is missing in DB
             if check_hashes(password, user_data.get('password', '')):
                 return user_data
             else:
@@ -143,7 +139,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated for new Column B-Q structure)
+# 4. Data Loading (Updated for new Column B-Q structure & N/A)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6dfsUdo7SbnqVnWvdP_kqe63PkSL8ni7bH6r6c86MLUtf_q58r0gI2Ft2460/pub?output=csv"
 
@@ -152,35 +148,27 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTTIN0pxN-TYH1-_Exm6d
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        # Updated column mapping (0-indexed: A=0, B=1, C=2...)
         c = {
-            "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommender
-            "title": 3,     # Col D: Title
-            "author": 4,    # Col E: Author
-            "ar": 5,        # Col F: ATOS Level
-            "quiz": 7,      # Col H: Quiz No
-            "word": 8,      # Col I: Word Count
-            "en": 10,       # Col K: English Recommendation Reason
-            "cn": 12,       # Col M: Chinese Recommendation Reason
-            "fnf": 14,      # Col O: Fiction/Nonfiction
-            "topic": 15,    # Col P: Topic-Subtopic
-            "series": 16    # Col Q: Series
+            "il": 1, "rec": 2, "title": 3, "author": 4, "ar": 5,
+            "quiz": 7, "word": 8, "en": 10, "cn": 12, "fnf": 14,
+            "topic": 15, "series": 16
         }
-       
-        # Data Cleaning: Extract AR numbers from Col F (index 5)
-        df.iloc[:, c['ar']] = pd.to_numeric(
+        
+        # Keep numeric versions for filtering/sliders
+        df['ar_numeric'] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
-       
-        # Convert word count from Col I (index 8) to integers
-        df.iloc[:, c['word']] = pd.to_numeric(
+        
+        df['word_numeric'] = pd.to_numeric(
             df.iloc[:, c['word']],
             errors='coerce'
         ).fillna(0).astype(int)
-       
-        return df.fillna(" "), c
+
+        # Global replace for display: turn 0, 0.0, or empty strings into "N/A"
+        df = df.replace([0, 0.0, '0', '0.0', ' ', ''], "N/A")
+        
+        return df.fillna("N/A"), c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
         return pd.DataFrame(), {}
@@ -196,7 +184,6 @@ state_keys = {
     'bk_focus': None, 'lang_mode': 'EN', 'voted': set(),
     'edit_id': None, 'edit_doc_id': None, 'blind_idx': None,
     'temp_comment': "", 'form_version': 0,
-    # User Login Status
     'logged_in': False, 'user_email': None, 'user_nickname': "Guest", 'user_role': 'guest'
 }
 
@@ -212,27 +199,26 @@ for key, val in state_keys.items():
 with st.sidebar:
     try: st.image("YDRC-logo.png", use_container_width=True)
     except: pass
-   
+    
     st.markdown("### 👤 User Center")
-   
+    
     if not st.session_state.logged_in:
         auth_mode = st.tabs(["Login", "Register"])
-       
-        with auth_mode[0]: # Login
+        
+        with auth_mode[0]:
             l_email = st.text_input("Email", key="l_email")
             l_pass = st.text_input("Password", type="password", key="l_pass")
             if st.button("🚀 Login"):
                 user_info = login_user(l_email, l_pass)
                 if user_info:
                     st.session_state.logged_in = True
-                    # Fix 2: Prevent KeyError: 'email'
                     st.session_state.user_email = user_info.get('email', l_email)
                     st.session_state.user_nickname = user_info.get('nickname', 'User')
                     st.session_state.user_role = get_user_role(st.session_state.user_email)
                     st.rerun()
 
 
-        with auth_mode[1]: # Register
+        with auth_mode[1]:
             r_email = st.text_input("Email (Account ID)", key="r_email")
             r_nick = st.text_input("Nickname (Display Name)", key="r_nick")
             r_pass = st.text_input("Password", type="password", key="r_pass")
@@ -242,13 +228,12 @@ with st.sidebar:
                         register_user(r_email, r_pass, r_nick)
                     else: st.warning("Password must be at least 6 characters.")
                 else: st.warning("Please enter a valid email.")
-           
-            # --- Password Reset Functionality ---
+            
             st.write("---")
             with st.expander("🔑 Forgot/Reset Password"):
                 st.caption("Verify Project ID to reset account")
                 target_m = st.text_input("Account Email", key="t_m")
-                pid_key = st.text_input("Project ID Verification", type="password", help="Check your secrets configuration")
+                pid_key = st.text_input("Project ID Verification", type="password")
                 new_p = st.text_input("New Password", type="password", key="n_p")
                 if st.button("Confirm Reset"):
                     try:
@@ -260,14 +245,13 @@ with st.sidebar:
 
 
     else:
-        # Logged-in view
         role_badges = {"owner": "👑 Owner", "admin": "🛡️ Admin", "user": "👤 User"}
         role_cls = f"badge-{st.session_state.user_role}"
         st.markdown(f"""
         <div class='user-badge {role_cls}'>{role_badges.get(st.session_state.user_role, 'Guest')}</div>
         <div style='font-size:1.2em'>Hello, <b>{st.session_state.user_nickname}</b></div>
         """, unsafe_allow_html=True)
-       
+        
         if st.button("👋 Log Out"):
             st.session_state.logged_in = False
             st.session_state.user_email = None
@@ -276,7 +260,6 @@ with st.sidebar:
             st.rerun()
 
 
-        # --- Owner Management Panel ---
         if st.session_state.user_role == 'owner':
             with st.expander("⚙️ Permissions (Owner Only)"):
                 manage_email = st.text_input("User Email")
@@ -305,7 +288,6 @@ def load_db_comments(book_title):
         col_ref = db.collection("comments").where("book", "==", book_title)
         docs = col_ref.stream()
         comments = [{"id": d.id, **d.to_dict()} for d in docs]
-        # Sort by timestamp
         return sorted(comments, key=lambda x: x.get('timestamp', str(datetime.now())), reverse=True)
     except: return []
 
@@ -313,8 +295,7 @@ def load_db_comments(book_title):
 def save_db_comment(book_title, text, comment_id=None):
     if db is None: return
     data = {
-        "book": book_title,
-        "text": text,
+        "book": book_title, "text": text,
         "author_email": st.session_state.user_email,
         "author_nick": st.session_state.user_nickname,
         "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -345,18 +326,22 @@ def delete_comment(comment_id):
 if st.session_state.bk_focus is not None:
     row = df.iloc[st.session_state.bk_focus]
     title_key = str(row.iloc[idx['title']])
-   
+    
     if st.button("⬅️ Back to Library"):
         st.session_state.bk_focus = None
         st.rerun()
-   
+    
     st.markdown(f"# 📖 {title_key}")
-   
-    # Info Cards
+    
     c1, c2, c3 = st.columns(3)
+    
+    # Handle formatting for word count (don't format if it's N/A string)
+    v_word = row.iloc[idx['word']]
+    display_word = f"{v_word:,}" if isinstance(v_word, (int, float)) else v_word
+
     infos = [
         ("👤 Author", row.iloc[idx['author']]), ("📚 Genre", row.iloc[idx['fnf']]), ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 ATOS Book Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
+        ("📊 ATOS Book Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", display_word),
         ("🔗 Series", row.iloc[idx['series']]), ("🏷️ Topic", row.iloc[idx['topic']]), ("🙋 Recommender", row.iloc[idx['rec']])
     ]
     for i, (l, v) in enumerate(infos):
@@ -367,22 +352,19 @@ if st.session_state.bk_focus is not None:
     lb1, lb2, _ = st.columns([1,1,2])
     if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
-   
-    # Toggle content language
+    
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
 
 
     st.markdown("---")
     st.subheader("💬 Comment Area")
-   
-    # Load comments
     cloud_comments = load_db_comments(title_key)
-   
+    
     for i, m in enumerate(cloud_comments):
         is_mine = m.get('author_email') == st.session_state.user_email
         is_admin = st.session_state.user_role in ['admin', 'owner']
-       
+        
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-meta">
@@ -392,55 +374,35 @@ if st.session_state.bk_focus is not None:
             {m.get('text')}
         </div>
         """, unsafe_allow_html=True)
-       
+        
         col_ops = st.columns([1, 1, 8])
-       
-        # Edit Button (Owner of comment only)
         if st.session_state.logged_in and is_mine and st.session_state.edit_id is None:
-            if col_ops[0].button("✏️", key=f"edit_{i}", help="Edit comment"):
-                st.session_state.edit_id = i
-                st.session_state.edit_doc_id = m["id"]
-                st.session_state.temp_comment = m["text"]
-                st.session_state.form_version += 1
-                st.rerun()
-       
-        # Delete Button (Owner or Admin)
+            if col_ops[0].button("✏️", key=f"edit_{i}"):
+                st.session_state.edit_id = i; st.session_state.edit_doc_id = m["id"]
+                st.session_state.temp_comment = m["text"]; st.session_state.form_version += 1; st.rerun()
+        
         if st.session_state.logged_in and (is_mine or is_admin) and st.session_state.edit_id is None:
-             if col_ops[1].button("🗑️", key=f"del_{i}", help="Delete comment"):
-                 delete_comment(m["id"])
-                 st.rerun()
+             if col_ops[1].button("🗑️", key=f"del_{i}"):
+                 delete_comment(m["id"]); st.rerun()
 
 
-    # Comment Input Box
     if st.session_state.logged_in:
         is_editing = st.session_state.edit_id is not None
-        input_key = f"input_area_v{st.session_state.form_version}"
-       
         with st.form("comment_form", clear_on_submit=False):
-            st.write("✍️ " + ("Edit Comment" if is_editing else f"Post Comment (as {st.session_state.user_nickname})"))
-            user_input = st.text_area("Content", value=st.session_state.temp_comment, key=input_key)
-           
+            st.write("✍️ " + ("Edit Comment" if is_editing else f"Post Comment"))
+            user_input = st.text_area("Content", value=st.session_state.temp_comment, key=f"input_area_v{st.session_state.form_version}")
             cb1, cb2, _ = st.columns([1, 1, 4])
             if cb1.form_submit_button("Post" if not is_editing else "Save"):
                 if user_input.strip():
                     save_db_comment(title_key, user_input, st.session_state.get('edit_doc_id'))
-                    st.session_state.edit_id = None
-                    st.session_state.edit_doc_id = None
-                    st.session_state.temp_comment = ""
-                    st.session_state.form_version += 1
-                    st.rerun()
-                else: st.warning("Content cannot be empty.")
-           
+                    st.session_state.edit_id = None; st.session_state.temp_comment = ""; st.session_state.form_version += 1; st.rerun()
             if is_editing and cb2.form_submit_button("❌ Cancel"):
-                st.session_state.edit_id = None; st.session_state.edit_doc_id = None
-                st.session_state.temp_comment = ""; st.session_state.form_version += 1
-                st.rerun()
-    else:
-        st.info("🔒 Guest mode is view-only. Want to post or interact? Please register or login on the left.")
+                st.session_state.edit_id = None; st.session_state.temp_comment = ""; st.session_state.form_version += 1; st.rerun()
+    else: st.info("🔒 Guest mode is view-only.")
 
 
 # ==========================================
-# 9. Main View (Filtering and Library Wall)
+# 9. Main View
 # ==========================================
 elif not df.empty:
     with st.sidebar:
@@ -449,7 +411,7 @@ elif not df.empty:
         f_title = st.text_input("📖 Title")
         f_author = st.text_input("👤 Author")
         f_fnf = st.selectbox("📚 Genre", ["All", "Fiction", "Nonfiction"])
-        il_opts = ["All"] + sorted([x for x in df.iloc[:, idx['il']].unique().tolist() if str(x)!="nan"])
+        il_opts = ["All"] + sorted([x for x in df.iloc[:, idx['il']].unique().tolist() if str(x)!="N/A"])
         f_il = st.selectbox("🎯 Interest Level", il_opts)
         f_word = st.number_input("📝 Minimum Word Count", min_value=0, step=100)
         f_quiz = st.text_input("🔢 AR Quiz Number")
@@ -459,10 +421,9 @@ elif not df.empty:
         f_ar = st.slider("📊 ATOS Book Level Range", 0.0, 12.0, (0.0, 12.0))
 
 
-    # Filter Logic
+    # Filter Logic using numeric columns for ATOS and Word Count
     f_df = df.copy()
-    if f_fuzzy:
-        f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+    if f_fuzzy: f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
     if f_author: f_df = f_df[f_df.iloc[:, idx['author']].astype(str).str.contains(f_author, case=False)]
     if f_fnf != "All": f_df = f_df[f_df.iloc[:, idx['fnf']] == f_fnf]
@@ -470,16 +431,18 @@ elif not df.empty:
     if f_quiz: f_df = f_df[f_df.iloc[:, idx['quiz']].astype(str).str.contains(f_quiz)]
     if f_series: f_df = f_df[f_df.iloc[:, idx['series']].astype(str).str.contains(f_series, case=False)]
     if f_topic: f_df = f_df[f_df.iloc[:, idx['topic']].astype(str).str.contains(f_topic, case=False)]
-    f_df = f_df[(f_df.iloc[:, idx['ar']] >= f_ar[0]) & (f_df.iloc[:, idx['ar']] <= f_ar[1]) & (f_df.iloc[:, idx['word']] >= f_word)]
+    
+    # Use numeric helper columns for the ranges
+    f_df = f_df[(f_df['ar_numeric'] >= f_ar[0]) & (f_df['ar_numeric'] <= f_ar[1]) & (f_df['word_numeric'] >= f_word)]
 
 
     tab1, tab2, tab3 = st.tabs(["📚 Book Gallery", "📊 Level Distribution", "🏆 Top Rated"])
-   
+    
     with tab1:
         if st.button("🎁 Open Mystery Book Blind Box", use_container_width=True):
             st.balloons()
             st.session_state.blind_idx = f_df.sample(1).index[0] if not f_df.empty else df.sample(1).index[0]
-       
+        
         if st.session_state.blind_idx is not None:
             b_row = df.iloc[st.session_state.blind_idx]
             _, b_col, _ = st.columns([1, 2, 1])
@@ -494,27 +457,28 @@ elif not df.empty:
             with cols[i % 3]:
                 t = row.iloc[idx['title']]
                 voted = t in st.session_state.voted
+                v_word = row.iloc[idx['word']]
+                word_tag = f"{v_word:,} Words" if isinstance(v_word, (int, float)) else f"{v_word} Words"
+
                 st.markdown(f"""
                 <div class="book-tile">
                     <div class="tile-title">《{t}》</div>
                     <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
                     <div class="tag-container">
                         <span class="tag tag-ar">ATOS {row.iloc[idx["ar"]]}</span>
-                        <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
+                        <span class="tag tag-word">{word_tag}</span>
                         <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
                         <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-               
+                
                 cl, cr = st.columns(2)
-               
-                # Like button (available to all users including guests)
                 if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
                     if voted: st.session_state.voted.remove(t)
                     else: st.session_state.voted.add(t)
                     st.rerun()
-               
+                
                 if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                     st.session_state.bk_focus = orig_idx; st.rerun()
 
@@ -522,7 +486,7 @@ elif not df.empty:
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
         if not f_df.empty:
-            st.bar_chart(f_df.iloc[:, idx['ar']].value_counts().sort_index())
+            st.bar_chart(f_df['ar_numeric'].value_counts().sort_index())
 
 
     with tab3:
