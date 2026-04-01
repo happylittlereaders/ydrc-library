@@ -30,7 +30,7 @@ st.markdown("""
     .tag-word { background: #1e3d59; } 
     .tag-fnf { background: #2a9d8f; } 
     .tag-quiz { background: #6d597a; }
-    .tag-il { background: #8888cc; } /* New Interest Level Tag Color */
+    .tag-il { background: #8888cc; } 
 
 
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
@@ -143,7 +143,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Updated for new Column B-N structure)
+# 4. Data Loading (Mapped to include Column A)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
 
@@ -152,26 +152,30 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyO
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
+        
+        # Mapping accounts for Column A (Timestamp) as Index 0
         c = {
-            "il": 0,        # Col B: Interest Level
-            "rec": 1,       # Col C: Recommender
-            "title": 2,     # Col D: Title
-            "author": 4,    # Col F: Author
-            "quiz": 5,      # Col G: Quiz No
-            "ar": 6,        # Col H: ATOS Level
-            "word": 7,      # Col I: Word Count
-            "fnf": 8,       # Col J: Fiction/Nonfiction
-            "topic": 9,     # Col K: Topic-Subtopic
-            "series": 10,   # Col L: Series
-            "en": 11,       # Col M: English Recommendation Reason
-            "cn": 12        # Col N: Chinese Recommendation Reason
+            "il": 1,        # Col B: Interest Level
+            "rec": 2,       # Col C: Recommended By
+            "title": 3,     # Col D: Book Title
+            "author": 5,    # Col F: Author
+            "quiz": 6,      # Col G: AR Quiz Number
+            "ar": 7,        # Col H: ATOS Book Level
+            "word": 8,      # Col I: Word Count
+            "fnf": 9,       # Col J: Fiction/Nonfiction
+            "topic": 10,    # Col K: Topic-Subtopic
+            "series": 11,   # Col L: Series
+            "en": 12,       # Col M: ENGLISH Recommendation
+            "cn": 13        # Col N: CHINESE Recommendation
         }
         
+        # Numeric extraction for ATOS Level (Col H)
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
         
+        # Numeric extraction for Word Count (Col I)
         df.iloc[:, c['word']] = pd.to_numeric(
             df.iloc[:, c['word']],
             errors='coerce'
@@ -203,7 +207,7 @@ for key, val in state_keys.items():
 
 
 # ==========================================
-# 6. Sidebar: Login/Register/Management
+# 6. Sidebar: User Auth & Management
 # ==========================================
 with st.sidebar:
     try: st.image("YDRC-logo.png", use_container_width=True)
@@ -344,12 +348,19 @@ if st.session_state.bk_focus is not None:
     
     c1, c2, c3 = st.columns(3)
     infos = [
-        ("👤 Author", row.iloc[idx['author']]), ("📚 Genre", row.iloc[idx['fnf']]), ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 ATOS Book Level", row.iloc[idx['ar']]), ("🔢 Quiz No.", row.iloc[idx['quiz']]), ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
-        ("🔗 Series", row.iloc[idx['series']]), ("🏷️ Topic", row.iloc[idx['topic']]), ("🙋 Recommender", row.iloc[idx['rec']])
+        ("👤 Author", row.iloc[idx['author']]), 
+        ("📚 Genre", row.iloc[idx['fnf']]), 
+        ("🎯 Interest Level", row.iloc[idx['il']]),
+        ("📊 ATOS Book Level", row.iloc[idx['ar']]), 
+        ("🔢 Quiz No.", row.iloc[idx['quiz']]), 
+        ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
+        ("🔗 Series", row.iloc[idx['series']]), 
+        ("🏷️ Topic", row.iloc[idx['topic']]), 
+        ("🙋 Recommender", row.iloc[idx['rec']])
     ]
     for i, (l, v) in enumerate(infos):
-        with [c1, c2, c3][i % 3]: st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
+        with [c1, c2, c3][i % 3]: 
+            st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
 
 
     st.write("#### 🌟 Recommendation Details")
@@ -402,11 +413,11 @@ if st.session_state.bk_focus is not None:
                     st.session_state.edit_id = None; st.session_state.temp_comment = ""; st.session_state.form_version += 1; st.rerun()
             if is_editing and cb2.form_submit_button("❌ Cancel"):
                 st.session_state.edit_id = None; st.session_state.temp_comment = ""; st.session_state.form_version += 1; st.rerun()
-    else: st.info("🔒 Guest mode is view-only.")
+    else: st.info("🔒 Guest mode is view-only. Log in to comment.")
 
 
 # ==========================================
-# 9. Main View
+# 9. Main Gallery View
 # ==========================================
 elif not df.empty:
     with st.sidebar:
