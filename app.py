@@ -18,41 +18,52 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* 1. Basic Colors & Layout */
+    /* 1. Global App & Sidebar Colors */
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
-    .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
+    
+    /* 2. HEADER CLEANUP (The GitHub & Deploy Remover) */
+    /* This hides the background of the header and all standard links/buttons */
+    header[data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important; /* Makes the header bar transparent */
+    }
 
-    /* 2. THE SURGICAL HEADER CLEANER */
-    /* Hide the GitHub icon (the anchor tag) */
-    header[data-testid="stHeader"] a {
+    /* Hide GitHub icon and Deploy button specifically */
+    header[data-testid="stHeader"] a, 
+    .stAppDeployButton {
         display: none !important;
     }
-    
-    /* Hide the Deploy button and Help menu, but EXEMPT the sidebar toggle */
+
+    /* Hide the '...' menu but KEEP the sidebar toggle */
     header[data-testid="stHeader"] button:not([data-testid="stSidebarCollapsedControl"]) {
         display: none !important;
     }
 
-    /* 3. FORCE SIDEBAR TOGGLE VISIBILITY */
-    /* This targets both the 'X' (close) and '>' (open) buttons */
+    /* 3. THE "COME BACK" BUTTON (Surgical Fix) */
+    /* This forces the '>' and 'X' buttons to be visible, dark blue, and clickable */
     [data-testid="stSidebarCollapsedControl"], 
     button[kind="headerNoFrame"] {
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
-        color: #1e3d59 !important; /* Dark blue so you can see it */
+        color: #1e3d59 !important; /* Dark Blue Arrow */
+        background-color: rgba(30, 61, 89, 0.1) !important; /* Light blue circular background */
+        border-radius: 50% !important;
+        z-index: 999999 !important;
+    }
+    
+    /* Hover effect for the button so you know it's there */
+    [data-testid="stSidebarCollapsedControl"]:hover {
+        background-color: rgba(30, 61, 89, 0.2) !important;
     }
 
-    /* 4. HIDE FOOTER & SYSTEM DECORATION */
-    [data-testid="stStatusWidget"],
-    [data-testid="stAppViewBlockContainer"] > section:last-child,
-    footer, 
-    [data-testid="stDecoration"] {
+    /* 4. HIDE FOOTER & DECORATION */
+    footer, [data-testid="stDecoration"], [data-testid="stStatusWidget"] {
         display: none !important;
     }
 
-    /* 5. UI Component Styling */
+    /* 5. UI Elements (Book Tiles, etc) */
+    .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -62,15 +73,10 @@ st.markdown("""
     .tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; color: white; }
     .tag-ar { background: #ff6e40; } .tag-word { background: #1e3d59; } .tag-fnf { background: #2a9d8f; } .tag-quiz { background: #6d597a; }
     
-    .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
-    .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
-    .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
     .badge-user { background-color: #2a9d8f; color: #fff; }
-    .badge-guest { background-color: #ccc; color: #555; }
     </style>
 """, unsafe_allow_html=True)
 
