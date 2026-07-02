@@ -186,55 +186,49 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Fixed for Dtype and Series Errors)
+# 4. Data Loading (Updated for New Spreadsheet Link)
 # ==========================================
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
-
-
-
+# Converted your new link into a direct CSV export URL using its specific gid (897583843)
+CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUguEHbuv0XQfdW5M/export?format=csv&gid=897583843"
 
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-       
-        # Mapping accounts for Column A (Timestamp) as Index 0
+        
+        # Mapping accounts for Column A (Timestamp / 时间戳记) as Index 0
         c = {
             "il": 1,        # Col B: Interest Level
-            "rec": 2,       # Col C: Recommended By
+            "rec": 2,       # Col C: Recommended by
             "title": 3,     # Col D: Book Title
-            "author": 5,    # Col F: Author
+            "author": 5,    # Col F: Author (Index 4 is Book/AR Website, skipped here)
             "quiz": 6,      # Col G: AR Quiz Number
             "ar": 7,        # Col H: ATOS Book Level
             "word": 8,      # Col I: Word Count
             "fnf": 9,       # Col J: Fiction/Nonfiction
             "topic": 10,    # Col K: Topic-Subtopic
             "series": 11,   # Col L: Series
-            "en": 12,       # Col M: ENGLISH Recommendation
-            "cn": 13        # Col N: CHINESE Recommendation
+            "en": 12,       # Col M: ENGLISH - Personal Recommendation
+            "cn": 13        # Col N: CHINESE - Personal Recommendation
         }
-       
+        
         # Convert AR level (Col H) - robust handling for strings or numbers
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
-       
+        
         # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
-        # First convert to string to safely remove any commas/formatting, then back to numeric
         word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
         df.iloc[:, c['word']] = pd.to_numeric(
             word_col_cleaned,
             errors='coerce'
         ).fillna(0).astype(int)
-       
+        
         return df.fillna(" "), c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
         return pd.DataFrame(), {}
-
-
-
 
 df, idx = load_data()
 
