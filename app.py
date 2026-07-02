@@ -7,10 +7,14 @@ import hashlib
 import re
 
 
+
+
 # ==========================================
 # 1. Styles and Configuration
 # ==========================================
 st.set_page_config(page_title="Smart Library · Flagship Edition", layout="wide", page_icon="📚")
+
+
 
 
 st.markdown("""
@@ -18,7 +22,7 @@ st.markdown("""
     .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
-    
+   
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 330px; display: flex; flex-direction: column;
@@ -26,11 +30,12 @@ st.markdown("""
     .tile-title { color: #1e3d59; font-size: 1.1em; font-weight: bold; margin-bottom: 5px; height: 2.8em; overflow: hidden; }
     .tag-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
     .tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; color: white; }
-    .tag-ar { background: #ff6e40; } 
-    .tag-word { background: #1e3d59; } 
-    .tag-fnf { background: #2a9d8f; } 
+    .tag-ar { background: #ff6e40; }
+    .tag-word { background: #1e3d59; }
+    .tag-fnf { background: #2a9d8f; }
     .tag-quiz { background: #6d597a; }
-    .tag-il { background: #8888cc; } 
+    .tag-il { background: #8888cc; }
+
 
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
     .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
@@ -39,7 +44,7 @@ st.markdown("""
         text-align: center; box-shadow: 0 10px 25px rgba(255,110,64,0.15); margin: 15px 0;
     }
     .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    
+   
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
@@ -49,9 +54,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+
+
 # ==========================================
 # 2. Database and Security Tools
 # ==========================================
+
 
 @st.cache_resource
 def get_db_client():
@@ -59,48 +67,55 @@ def get_db_client():
     try:
         # Pull the dictionary from Streamlit Secrets
         key_dict = st.secrets["firestore"]
-        
+       
         # Create credentials from the dictionary
         creds = service_account.Credentials.from_service_account_info(key_dict)
-        
+       
         # Initialize the client with explicit project and database ID
         return firestore.Client(
-            credentials=creds, 
-            project=key_dict["project_id"].strip(), 
-            database="default" 
+            credentials=creds,
+            project=key_dict["project_id"].strip(),
+            database="default"
         )
     except Exception as e:
         st.error(f"❌ Database Connection Error: {e}")
         return None
 
+
 # Global database instance
 db = get_db_client()
+
 
 def make_hash(password):
     """Simple password hashing"""
     return hashlib.sha256(str.encode(password)).hexdigest()
 
+
 def check_hashes(password, hashed_text):
     return make_hash(password) == hashed_text
+
 
 def validate_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
 
 
+
+
 # ==========================================
 # 3. User Permission Management Logic
 # ==========================================
 
+
 def get_user_role(email):
     """Retrieve user role"""
-    if db is None: 
+    if db is None:
         return "guest"
-    
+   
     # Check if this is the owner email defined in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
-    
+   
     try:
         doc = db.collection("users").document(email).get()
         if doc.exists:
@@ -109,25 +124,27 @@ def get_user_role(email):
         pass
     return "guest"
 
+
 def register_user(email, password, nickname):
-    if db is None: 
+    if db is None:
         st.error("Database not connected.")
         return False
-        
+       
     # Basic validation to prevent empty documents (like in your screenshot)
     if not email or not password or not nickname:
         st.error("All fields are required for registration.")
         return False
+
 
     try:
         doc_ref = db.collection("users").document(email)
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
-        
+       
         # Determine role based on owner email
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
-        
+       
         doc_ref.set({
             "email": email,
             "password": make_hash(password),
@@ -141,14 +158,16 @@ def register_user(email, password, nickname):
         st.error(f"Registration failed: {e}")
         return False
 
+
 def login_user(email, password):
-    if db is None: 
+    if db is None:
         st.error("Database connection is down.")
         return None
-        
+       
     if not email or not password:
         st.error("Please enter both email and password.")
         return None
+
 
     try:
         doc = db.collection("users").document(email).get()
@@ -165,16 +184,20 @@ def login_user(email, password):
         st.error(f"Login error: {e}")
     return None
 
+
 # ==========================================
 # 4. Data Loading (Fixed for Dtype and Series Errors)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ2xyepUjTQAJ5eAERyOcFMCA7_bGHGXq9TqcS0YdeelDK8nIgBPrRsjMzxFFu7qpUfvOJf5uqmGyx/pub?gid=1987014355&single=true&output=csv"
 
+
+
+
 @st.cache_data(ttl=600)
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-        
+       
         # Mapping accounts for Column A (Timestamp) as Index 0
         c = {
             "il": 1,        # Col B: Interest Level
@@ -190,28 +213,32 @@ def load_data():
             "en": 12,       # Col M: ENGLISH Recommendation
             "cn": 13        # Col N: CHINESE Recommendation
         }
-        
+       
         # Convert AR level (Col H) - robust handling for strings or numbers
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
-        
+       
         # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
         # First convert to string to safely remove any commas/formatting, then back to numeric
         word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
         df.iloc[:, c['word']] = pd.to_numeric(
-            word_col_cleaned, 
+            word_col_cleaned,
             errors='coerce'
         ).fillna(0).astype(int)
-        
+       
         return df.fillna(" "), c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
         return pd.DataFrame(), {}
 
 
+
+
 df, idx = load_data()
+
+
 
 
 # ==========================================
@@ -225,9 +252,13 @@ state_keys = {
 }
 
 
+
+
 for key, val in state_keys.items():
     if key not in st.session_state:
         st.session_state[key] = val
+
+
 
 
 # ==========================================
@@ -236,12 +267,12 @@ for key, val in state_keys.items():
 with st.sidebar:
     try: st.image("YDRC-logo.png", use_container_width=True)
     except: pass
-    
+   
     st.markdown("### 👤 User Center")
-    
+   
     if not st.session_state.logged_in:
         auth_mode = st.tabs(["Login", "Register"])
-        
+       
         with auth_mode[0]:
             l_email = st.text_input("Email", key="l_email")
             l_pass = st.text_input("Password", type="password", key="l_pass")
@@ -255,6 +286,8 @@ with st.sidebar:
                     st.rerun()
 
 
+
+
         with auth_mode[1]:
             r_email = st.text_input("Email (Account ID)", key="r_email")
             r_nick = st.text_input("Nickname (Display Name)", key="r_nick")
@@ -265,7 +298,7 @@ with st.sidebar:
                         register_user(r_email, r_pass, r_nick)
                     else: st.warning("Password must be at least 6 characters.")
                 else: st.warning("Please enter a valid email.")
-            
+           
             st.write("---")
             with st.expander("🔑 Forgot/Reset Password"):
                 st.caption("Verify Project ID to reset account")
@@ -281,6 +314,8 @@ with st.sidebar:
                     except: st.error("Reset failed. Email might not be registered.")
 
 
+
+
     else:
         role_badges = {"owner": "👑 Owner", "admin": "🛡️ Admin", "user": "👤 User"}
         role_cls = f"badge-{st.session_state.user_role}"
@@ -288,13 +323,15 @@ with st.sidebar:
         <div class='user-badge {role_cls}'>{role_badges.get(st.session_state.user_role, 'Guest')}</div>
         <div style='font-size:1.2em'>Hello, <b>{st.session_state.user_nickname}</b></div>
         """, unsafe_allow_html=True)
-        
+       
         if st.button("👋 Log Out"):
             st.session_state.logged_in = False
             st.session_state.user_email = None
             st.session_state.user_nickname = "Guest"
             st.session_state.user_role = "guest"
             st.rerun()
+
+
 
 
         if st.session_state.user_role == 'owner':
@@ -310,13 +347,19 @@ with st.sidebar:
                             st.error(f"Update failed: {e}")
 
 
+
+
     st.write("---")
     st.markdown('<div class="sidebar-title">🔍 Search Center</div>', unsafe_allow_html=True)
+
+
 
 
 # ==========================================
 # 7. Comment Logic
 # ==========================================
+
+
 
 
 def load_db_comments(book_title):
@@ -327,6 +370,8 @@ def load_db_comments(book_title):
         comments = [{"id": d.id, **d.to_dict()} for d in docs]
         return sorted(comments, key=lambda x: x.get('timestamp', str(datetime.now())), reverse=True)
     except: return []
+
+
 
 
 def save_db_comment(book_title, text, comment_id=None):
@@ -348,6 +393,8 @@ def save_db_comment(book_title, text, comment_id=None):
         st.error(f"Save failed: {e}")
 
 
+
+
 def delete_comment(comment_id):
     if db:
         try:
@@ -357,53 +404,59 @@ def delete_comment(comment_id):
             st.error(f"Delete failed: {e}")
 
 
+
+
 # ==========================================
 # 8. Book Detail Page
 # ==========================================
 if st.session_state.bk_focus is not None:
     row = df.iloc[st.session_state.bk_focus]
     title_key = str(row.iloc[idx['title']])
-    
+   
     if st.button("⬅️ Back to Library"):
         st.session_state.bk_focus = None
         st.rerun()
-    
+   
     st.markdown(f"# 📖 {title_key}")
-    
+   
     c1, c2, c3 = st.columns(3)
     infos = [
-        ("👤 Author", row.iloc[idx['author']]), 
-        ("📚 Genre", row.iloc[idx['fnf']]), 
+        ("👤 Author", row.iloc[idx['author']]),
+        ("📚 Genre", row.iloc[idx['fnf']]),
         ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 ATOS Book Level", row.iloc[idx['ar']]), 
-        ("🔢 Quiz No.", row.iloc[idx['quiz']]), 
+        ("📊 ATOS Book Level", row.iloc[idx['ar']]),
+        ("🔢 Quiz No.", row.iloc[idx['quiz']]),
         ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
-        ("🔗 Series", row.iloc[idx['series']]), 
-        ("🏷️ Topic", row.iloc[idx['topic']]), 
+        ("🔗 Series", row.iloc[idx['series']]),
+        ("🏷️ Topic", row.iloc[idx['topic']]),
         ("🙋 Recommender", row.iloc[idx['rec']])
     ]
     for i, (l, v) in enumerate(infos):
-        with [c1, c2, c3][i % 3]: 
+        with [c1, c2, c3][i % 3]:
             st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
+
+
 
 
     st.write("#### 🌟 Recommendation Details")
     lb1, lb2, _ = st.columns([1,1,2])
     if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
-    
+   
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
+
+
 
 
     st.markdown("---")
     st.subheader("💬 Comment Area")
     cloud_comments = load_db_comments(title_key)
-    
+   
     for i, m in enumerate(cloud_comments):
         is_mine = m.get('author_email') == st.session_state.user_email
         is_admin = st.session_state.user_role in ['admin', 'owner']
-        
+       
         st.markdown(f"""
         <div class="comment-box">
             <div class="comment-meta">
@@ -413,16 +466,18 @@ if st.session_state.bk_focus is not None:
             {m.get('text')}
         </div>
         """, unsafe_allow_html=True)
-        
+       
         col_ops = st.columns([1, 1, 8])
         if st.session_state.logged_in and is_mine and st.session_state.edit_id is None:
             if col_ops[0].button("✏️", key=f"edit_{i}"):
                 st.session_state.edit_id = i; st.session_state.edit_doc_id = m["id"]
                 st.session_state.temp_comment = m["text"]; st.session_state.form_version += 1; st.rerun()
-        
+       
         if st.session_state.logged_in and (is_mine or is_admin) and st.session_state.edit_id is None:
              if col_ops[1].button("🗑️", key=f"del_{i}"):
                  delete_comment(m["id"]); st.rerun()
+
+
 
 
     if st.session_state.logged_in:
@@ -438,6 +493,8 @@ if st.session_state.bk_focus is not None:
             if is_editing and cb2.form_submit_button("❌ Cancel"):
                 st.session_state.edit_id = None; st.session_state.temp_comment = ""; st.session_state.form_version += 1; st.rerun()
     else: st.info("🔒 Guest mode is view-only. Log in to comment.")
+
+
 
 
 # ==========================================
@@ -460,6 +517,8 @@ elif not df.empty:
         f_ar = st.slider("📊 ATOS Book Level Range", 0.0, 12.0, (0.0, 12.0))
 
 
+
+
     f_df = df.copy()
     if f_fuzzy: f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
@@ -472,13 +531,15 @@ elif not df.empty:
     f_df = f_df[(f_df.iloc[:, idx['ar']] >= f_ar[0]) & (f_df.iloc[:, idx['ar']] <= f_ar[1]) & (f_df.iloc[:, idx['word']] >= f_word)]
 
 
+
+
     tab1, tab2, tab3 = st.tabs(["📚 Book Gallery", "📊 Level Distribution", "🏆 Top Rated"])
-    
+   
     with tab1:
         if st.button("🎁 Open Mystery Book Blind Box", use_container_width=True):
             st.balloons()
             st.session_state.blind_idx = f_df.sample(1).index[0] if not f_df.empty else df.sample(1).index[0]
-        
+       
         if st.session_state.blind_idx is not None:
             b_row = df.iloc[st.session_state.blind_idx]
             _, b_col, _ = st.columns([1, 2, 1])
@@ -486,6 +547,8 @@ elif not df.empty:
                 st.markdown(f'<div class="blind-box-container"><h3>《{b_row.iloc[idx["title"]]}》</h3><p>Author: {b_row.iloc[idx["author"]]}</p></div>', unsafe_allow_html=True)
                 if st.button(f"🚀 Click for Details", key="blind_go", use_container_width=True):
                     st.session_state.bk_focus = st.session_state.blind_idx; st.rerun()
+
+
 
 
         cols = st.columns(3)
@@ -506,21 +569,25 @@ elif not df.empty:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                
+               
                 cl, cr = st.columns(2)
                 if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
                     if voted: st.session_state.voted.remove(t)
                     else: st.session_state.voted.add(t)
                     st.rerun()
-                
+               
                 if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                     st.session_state.bk_focus = orig_idx; st.rerun()
+
+
 
 
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
         if not f_df.empty:
             st.bar_chart(f_df.iloc[:, idx['ar']].value_counts().sort_index())
+
+
 
 
     with tab3:
