@@ -447,9 +447,9 @@ elif not df.empty:
                         "If no matching concepts appear, reply strictly with the word 'NONE'."
                     )
                     
-                    # Using Groq's free llama-3.3 engine instead of OpenAI
+                    # Using Groq's active production llama-3.3-70b-versatile engine
                     response = ai_client.chat.completions.create(
-                        model="llama-3.3-70b-specdec",
+                        model="llama-3.3-70b-versatile",
                         messages=[
                             {"role": "system", "content": system_instructions},
                             {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
