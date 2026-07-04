@@ -5,7 +5,7 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 import hashlib
 import re
-from groq import Groq  # Switched from openai to groq for free access
+from openai import OpenAI  # Added for AI search support
 
 # ==========================================
 # 1. Styles and Configuration
@@ -56,8 +56,13 @@ st.markdown("""
 def get_db_client():
     """Connect to Firestore Database"""
     try:
+        # Pull the dictionary from Streamlit Secrets
         key_dict = st.secrets["firestore"]
+       
+        # Create credentials from the dictionary
         creds = service_account.Credentials.from_service_account_info(key_dict)
+       
+        # Initialize the client with explicit project and database ID
         return firestore.Client(
             credentials=creds,
             project=key_dict["project_id"].strip(),
@@ -67,20 +72,22 @@ def get_db_client():
         st.error(f"❌ Database Connection Error: {e}")
         return None
 
+# Global database instance
 db = get_db_client()
 
-# Initialize Free Groq client helper safely from secrets
+# Initialize OpenAI client helper safely from secrets
 @st.cache_resource
-def get_groq_client():
+def get_openai_client():
     try:
-        return Groq(api_key=st.secrets["GROQ_API_KEY"])
+        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     except Exception as e:
-        st.error(f"❌ Groq Key Initialization Error: {e}")
+        st.error(f"❌ OpenAI Key Initialization Error: {e}")
         return None
 
-ai_client = get_groq_client()
+ai_client = get_openai_client()
 
 def make_hash(password):
+    """Simple password hashing"""
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def check_hashes(password, hashed_text):
@@ -96,10 +103,14 @@ def validate_email(email):
 # ==========================================
 
 def get_user_role(email):
+    """Retrieve user role"""
     if db is None:
         return "guest"
+   
+    # Check if this is the owner email defined in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
+   
     try:
         doc = db.collection("users").document(email).get()
         if doc.exists:
@@ -112,15 +123,21 @@ def register_user(email, password, nickname):
     if db is None:
         st.error("Database not connected.")
         return False
+       
+    # Basic validation to prevent empty documents (like in your screenshot)
     if not email or not password or not nickname:
         st.error("All fields are required for registration.")
         return False
+
     try:
         doc_ref = db.collection("users").document(email)
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
+       
+        # Determine role based on owner email
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
+       
         doc_ref.set({
             "email": email,
             "password": make_hash(password),
@@ -138,9 +155,11 @@ def login_user(email, password):
     if db is None:
         st.error("Database connection is down.")
         return None
+       
     if not email or not password:
         st.error("Please enter both email and password.")
         return None
+
     try:
         doc = db.collection("users").document(email).get()
         if doc.exists:
@@ -152,12 +171,13 @@ def login_user(email, password):
         else:
             st.error("User does not exist.")
     except Exception as e:
+        # This will catch the 404 if the project/database ID is still wrong
         st.error(f"Login error: {e}")
     return None
 
 
 # ==========================================
-# 4. Data Loading
+# 4. Data Loading (Fixed for Dtype and Series Errors)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUguEHbuv0XQfdW5M/export?format=csv&gid=897583843"
 
@@ -165,17 +185,31 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUg
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
+       
+        # Mapping accounts for Column A (Timestamp) as Index 0
         c = {
-            "il": 1, "rec": 2, "title": 3, "author": 5, "quiz": 6,
-            "ar": 7, "word": 8, "fnf": 9, "topic": 10, "series": 11,
-            "en": 12, "cn": 13
+            "il": 1,        # Col B: Interest Level
+            "rec": 2,       # Col C: Recommended By
+            "title": 3,     # Col D: Book Title
+            "author": 5,    # Col F: Author
+            "quiz": 6,      # Col G: AR Quiz Number
+            "ar": 7,        # Col H: ATOS Book Level
+            "word": 8,      # Col I: Word Count
+            "fnf": 9,       # Col J: Fiction/Nonfiction
+            "topic": 10,    # Col K: Topic-Subtopic
+            "series": 11,   # Col L: Series
+            "en": 12,       # Col M: ENGLISH Recommendation
+            "cn": 13        # Col N: CHINESE Recommendation
         }
        
+        # Convert AR level (Col H) - robust handling for strings or numbers
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
        
+        # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
+        # First convert to string to safely remove any commas/formatting, then back to numeric
         word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
         df.iloc[:, c['word']] = pd.to_numeric(
             word_col_cleaned,
@@ -184,6 +218,7 @@ def load_data():
         
         df = df.fillna(" ")
         
+        # Precompute string records so the AI engine can review titles, topics, and blurbs simultaneously
         def build_ai_context(row):
             return f"Index: {row.name} | Title: {row.iloc[c['title']]} | Author: {row.iloc[c['author']]} | Topic: {row.iloc[c['topic']]} | Blurb: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
         
@@ -417,6 +452,7 @@ if st.session_state.bk_focus is not None:
 # ==========================================
 elif not df.empty:
     with st.sidebar:
+        # Upgraded to intelligent AI search bar
         f_fuzzy = st.text_input("💡 **Smart AI Search**", placeholder="Enter concepts or keywords...")
         st.write("---")
         f_title = st.text_input("📖 Title")
@@ -433,10 +469,12 @@ elif not df.empty:
 
     f_df = df.copy()
     
+    # Process AI-driven context matching safely
     if f_fuzzy.strip():
         if ai_client is not None:
             with st.spinner("🧠 AI scanning library context..."):
                 try:
+                    # Collect precalculated summary references from the spreadsheet row copies
                     catalog_dump = "\n".join(f_df['_ai_context'].tolist())
                     
                     system_instructions = (
@@ -447,15 +485,15 @@ elif not df.empty:
                         "If no matching concepts appear, reply strictly with the word 'NONE'."
                     )
                     
-                    # Switched to llama-3.1-8b-instant (Active model with a 250K TPM limit)
                     response = ai_client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
+                        model="gpt-4o-mini",
                         messages=[
                             {"role": "system", "content": system_instructions},
                             {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
                         ],
                         temperature=0.0
-                    )                    
+                    )
+                    
                     ai_result = response.choices[0].message.content.strip()
                     
                     if "NONE" not in ai_result:
@@ -467,8 +505,10 @@ elif not df.empty:
                     st.sidebar.error(f"AI connection error, using word-match fallback: {ai_err}")
                     f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
         else:
+            # Fallback behavior if OpenAI client failed to load
             f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
 
+    # Preserve remaining sequential logic processing configurations
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
     if f_author: f_df = f_df[f_df.iloc[:, idx['author']].astype(str).str.contains(f_author, case=False)]
     if f_fnf != "All": f_df = f_df[f_df.iloc[:, idx['fnf']] == f_fnf]
@@ -541,3 +581,4 @@ elif not df.empty:
                         if st.button("View Details", key=f"fav_{b_name}"):
                             st.session_state.bk_focus = title_to_idx[b_name]; st.rerun()
         else: st.info("No favorites yet, go click ❤️!")
+
