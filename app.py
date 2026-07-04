@@ -5,17 +5,12 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 import hashlib
 import re
-
-
-
+from openai import OpenAI  # Added for AI search support
 
 # ==========================================
 # 1. Styles and Configuration
 # ==========================================
 st.set_page_config(page_title="Smart Library · Flagship Edition", layout="wide", page_icon="📚")
-
-
-
 
 st.markdown("""
     <style>
@@ -36,7 +31,6 @@ st.markdown("""
     .tag-quiz { background: #6d597a; }
     .tag-il { background: #8888cc; }
 
-
     .comment-box { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #eee; border-left: 5px solid #1e3d59; }
     .comment-meta { color: #888; font-size: 0.8em; margin-bottom: 5px; display: flex; justify-content: space-between;}
     .blind-box-container {
@@ -54,12 +48,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-
-
 # ==========================================
 # 2. Database and Security Tools
 # ==========================================
-
 
 @st.cache_resource
 def get_db_client():
@@ -81,31 +72,35 @@ def get_db_client():
         st.error(f"❌ Database Connection Error: {e}")
         return None
 
-
 # Global database instance
 db = get_db_client()
 
+# Initialize OpenAI client helper safely from secrets
+@st.cache_resource
+def get_openai_client():
+    try:
+        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    except Exception as e:
+        st.error(f"❌ OpenAI Key Initialization Error: {e}")
+        return None
+
+ai_client = get_openai_client()
 
 def make_hash(password):
     """Simple password hashing"""
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-
 def check_hashes(password, hashed_text):
     return make_hash(password) == hashed_text
-
 
 def validate_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(pattern, email)
 
 
-
-
 # ==========================================
 # 3. User Permission Management Logic
 # ==========================================
-
 
 def get_user_role(email):
     """Retrieve user role"""
@@ -124,7 +119,6 @@ def get_user_role(email):
         pass
     return "guest"
 
-
 def register_user(email, password, nickname):
     if db is None:
         st.error("Database not connected.")
@@ -134,7 +128,6 @@ def register_user(email, password, nickname):
     if not email or not password or not nickname:
         st.error("All fields are required for registration.")
         return False
-
 
     try:
         doc_ref = db.collection("users").document(email)
@@ -158,7 +151,6 @@ def register_user(email, password, nickname):
         st.error(f"Registration failed: {e}")
         return False
 
-
 def login_user(email, password):
     if db is None:
         st.error("Database connection is down.")
@@ -167,7 +159,6 @@ def login_user(email, password):
     if not email or not password:
         st.error("Please enter both email and password.")
         return None
-
 
     try:
         doc = db.collection("users").document(email).get()
@@ -189,8 +180,6 @@ def login_user(email, password):
 # 4. Data Loading (Fixed for Dtype and Series Errors)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUguEHbuv0XQfdW5M/export?format=csv&gid=897583843"
-
-
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -226,18 +215,21 @@ def load_data():
             word_col_cleaned,
             errors='coerce'
         ).fillna(0).astype(int)
+        
+        df = df.fillna(" ")
+        
+        # Precompute string records so the AI engine can review titles, topics, and blurbs simultaneously
+        def build_ai_context(row):
+            return f"Index: {row.name} | Title: {row.iloc[c['title']]} | Author: {row.iloc[c['author']]} | Topic: {row.iloc[c['topic']]} | Blurb: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
+        
+        df['_ai_context'] = df.apply(build_ai_context, axis=1)
        
-        return df.fillna(" "), c
+        return df, c
     except Exception as e:
         st.error(f"Data loading failed: {e}")
         return pd.DataFrame(), {}
 
-
-
-
 df, idx = load_data()
-
-
 
 
 # ==========================================
@@ -250,14 +242,9 @@ state_keys = {
     'logged_in': False, 'user_email': None, 'user_nickname': "Guest", 'user_role': 'guest'
 }
 
-
-
-
 for key, val in state_keys.items():
     if key not in st.session_state:
         st.session_state[key] = val
-
-
 
 
 # ==========================================
@@ -284,9 +271,6 @@ with st.sidebar:
                     st.session_state.user_role = get_user_role(st.session_state.user_email)
                     st.rerun()
 
-
-
-
         with auth_mode[1]:
             r_email = st.text_input("Email (Account ID)", key="r_email")
             r_nick = st.text_input("Nickname (Display Name)", key="r_nick")
@@ -312,9 +296,6 @@ with st.sidebar:
                         else: st.error("❌ Incorrect verification key.")
                     except: st.error("Reset failed. Email might not be registered.")
 
-
-
-
     else:
         role_badges = {"owner": "👑 Owner", "admin": "🛡️ Admin", "user": "👤 User"}
         role_cls = f"badge-{st.session_state.user_role}"
@@ -330,9 +311,6 @@ with st.sidebar:
             st.session_state.user_role = "guest"
             st.rerun()
 
-
-
-
         if st.session_state.user_role == 'owner':
             with st.expander("⚙️ Permissions (Owner Only)"):
                 manage_email = st.text_input("User Email")
@@ -345,21 +323,13 @@ with st.sidebar:
                         except Exception as e:
                             st.error(f"Update failed: {e}")
 
-
-
-
     st.write("---")
     st.markdown('<div class="sidebar-title">🔍 Search Center</div>', unsafe_allow_html=True)
-
-
 
 
 # ==========================================
 # 7. Comment Logic
 # ==========================================
-
-
-
 
 def load_db_comments(book_title):
     if db is None: return []
@@ -369,9 +339,6 @@ def load_db_comments(book_title):
         comments = [{"id": d.id, **d.to_dict()} for d in docs]
         return sorted(comments, key=lambda x: x.get('timestamp', str(datetime.now())), reverse=True)
     except: return []
-
-
-
 
 def save_db_comment(book_title, text, comment_id=None):
     if db is None: return
@@ -391,9 +358,6 @@ def save_db_comment(book_title, text, comment_id=None):
     except Exception as e:
         st.error(f"Save failed: {e}")
 
-
-
-
 def delete_comment(comment_id):
     if db:
         try:
@@ -401,8 +365,6 @@ def delete_comment(comment_id):
             st.toast("🗑️ Comment deleted")
         except Exception as e:
             st.error(f"Delete failed: {e}")
-
-
 
 
 # ==========================================
@@ -434,9 +396,6 @@ if st.session_state.bk_focus is not None:
         with [c1, c2, c3][i % 3]:
             st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
 
-
-
-
     st.write("#### 🌟 Recommendation Details")
     lb1, lb2, _ = st.columns([1,1,2])
     if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
@@ -444,9 +403,6 @@ if st.session_state.bk_focus is not None:
    
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
-
-
-
 
     st.markdown("---")
     st.subheader("💬 Comment Area")
@@ -476,9 +432,6 @@ if st.session_state.bk_focus is not None:
              if col_ops[1].button("🗑️", key=f"del_{i}"):
                  delete_comment(m["id"]); st.rerun()
 
-
-
-
     if st.session_state.logged_in:
         is_editing = st.session_state.edit_id is not None
         with st.form("comment_form", clear_on_submit=False):
@@ -494,14 +447,13 @@ if st.session_state.bk_focus is not None:
     else: st.info("🔒 Guest mode is view-only. Log in to comment.")
 
 
-
-
 # ==========================================
 # 9. Main Gallery View
 # ==========================================
 elif not df.empty:
     with st.sidebar:
-        f_fuzzy = st.text_input("💡 **Smart Fuzzy Search**", placeholder="Enter keywords...")
+        # Upgraded to intelligent AI search bar
+        f_fuzzy = st.text_input("💡 **Smart AI Search**", placeholder="Enter concepts or keywords...")
         st.write("---")
         f_title = st.text_input("📖 Title")
         f_author = st.text_input("👤 Author")
@@ -515,11 +467,48 @@ elif not df.empty:
         st.write("---")
         f_ar = st.slider("📊 ATOS Book Level Range", 0.0, 12.0, (0.0, 12.0))
 
-
-
-
     f_df = df.copy()
-    if f_fuzzy: f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+    
+    # Process AI-driven context matching safely
+    if f_fuzzy.strip():
+        if ai_client is not None:
+            with st.spinner("🧠 AI scanning library context..."):
+                try:
+                    # Collect precalculated summary references from the spreadsheet row copies
+                    catalog_dump = "\n".join(f_df['_ai_context'].tolist())
+                    
+                    system_instructions = (
+                        "You are an optimized search database index tool for a book catalog. "
+                        "The user will search using conversational questions, descriptions, or general concepts. "
+                        "Scan the text rows provided, and decide which Row Index integers match their search requirements. "
+                        "Output ONLY a clean comma-separated sequence of matching index numbers (e.g., 4,12,31). "
+                        "If no matching concepts appear, reply strictly with the word 'NONE'."
+                    )
+                    
+                    response = ai_client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": system_instructions},
+                            {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
+                        ],
+                        temperature=0.0
+                    )
+                    
+                    ai_result = response.choices[0].message.content.strip()
+                    
+                    if "NONE" not in ai_result:
+                        matched_indices = [int(i.strip()) for i in ai_result.split(",") if i.strip().isdigit()]
+                        f_df = f_df.loc[f_df.index.isin(matched_indices)]
+                    else:
+                        f_df = pd.DataFrame(columns=f_df.columns)
+                except Exception as ai_err:
+                    st.sidebar.error(f"AI connection error, using word-match fallback: {ai_err}")
+                    f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+        else:
+            # Fallback behavior if OpenAI client failed to load
+            f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+
+    # Preserve remaining sequential logic processing configurations
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
     if f_author: f_df = f_df[f_df.iloc[:, idx['author']].astype(str).str.contains(f_author, case=False)]
     if f_fnf != "All": f_df = f_df[f_df.iloc[:, idx['fnf']] == f_fnf]
@@ -528,9 +517,6 @@ elif not df.empty:
     if f_series: f_df = f_df[f_df.iloc[:, idx['series']].astype(str).str.contains(f_series, case=False)]
     if f_topic: f_df = f_df[f_df.iloc[:, idx['topic']].astype(str).str.contains(f_topic, case=False)]
     f_df = f_df[(f_df.iloc[:, idx['ar']] >= f_ar[0]) & (f_df.iloc[:, idx['ar']] <= f_ar[1]) & (f_df.iloc[:, idx['word']] >= f_word)]
-
-
-
 
     tab1, tab2, tab3 = st.tabs(["📚 Book Gallery", "📊 Level Distribution", "🏆 Top Rated"])
    
@@ -547,47 +533,41 @@ elif not df.empty:
                 if st.button(f"🚀 Click for Details", key="blind_go", use_container_width=True):
                     st.session_state.bk_focus = st.session_state.blind_idx; st.rerun()
 
-
-
-
-        cols = st.columns(3)
-        for i, (orig_idx, row) in enumerate(f_df.iterrows()):
-            with cols[i % 3]:
-                t = row.iloc[idx['title']]
-                voted = t in st.session_state.voted
-                st.markdown(f"""
-                <div class="book-tile">
-                    <div class="tile-title">《{t}》</div>
-                    <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
-                    <div class="tag-container">
-                        <span class="tag tag-ar">ATOS {row.iloc[idx["ar"]]}</span>
-                        <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
-                        <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
-                        <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
-                        <span class="tag tag-il">{row.iloc[idx["il"]]}</span>
+        if f_df.empty:
+            st.info("No matching books discovered. Try adjusting your query keywords or range limits.")
+        else:
+            cols = st.columns(3)
+            for i, (orig_idx, row) in enumerate(f_df.iterrows()):
+                with cols[i % 3]:
+                    t = row.iloc[idx['title']]
+                    voted = t in st.session_state.voted
+                    st.markdown(f"""
+                    <div class="book-tile">
+                        <div class="tile-title">《{t}》</div>
+                        <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
+                        <div class="tag-container">
+                            <span class="tag tag-ar">ATOS {row.iloc[idx["ar"]]}</span>
+                            <span class="tag tag-word">{row.iloc[idx["word"]]:,} Words</span>
+                            <span class="tag tag-fnf">{row.iloc[idx["fnf"]]}</span>
+                            <span class="tag tag-quiz">Q: {row.iloc[idx["quiz"]]}</span>
+                            <span class="tag tag-il">{row.iloc[idx["il"]]}</span>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-               
-                cl, cr = st.columns(2)
-                if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
-                    if voted: st.session_state.voted.remove(t)
-                    else: st.session_state.voted.add(t)
-                    st.rerun()
-               
-                if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
-                    st.session_state.bk_focus = orig_idx; st.rerun()
-
-
-
+                    """, unsafe_allow_html=True)
+                   
+                    cl, cr = st.columns(2)
+                    if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
+                        if voted: st.session_state.voted.remove(t)
+                        else: st.session_state.voted.add(t)
+                        st.rerun()
+                   
+                    if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
+                        st.session_state.bk_focus = orig_idx; st.rerun()
 
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
         if not f_df.empty:
             st.bar_chart(f_df.iloc[:, idx['ar']].value_counts().sort_index())
-
-
-
 
     with tab3:
         st.subheader("🏆 Your Favorites")
