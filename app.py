@@ -43,7 +43,11 @@ st.markdown("""
     .badge-admin { background-color: #ff6e40; color: #fff; }
     .badge-user { background-color: #2a9d8f; color: #fff; }
     .badge-guest { background-color: #ccc; color: #555; }
-    .footer {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stAppDeployButton {display: none;}
+    [data-testid="stStatusWidget"] {visibility: hidden;}
+    a[href*="streamlit.io"] {display: none !important;}
+    div[class*="viewerBadge"] {display: none !important;}
     </style>
 """, unsafe_allow_html=True)
 
