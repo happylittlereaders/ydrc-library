@@ -14,7 +14,7 @@ st.set_page_config(page_title="Smart Library · Flagship Edition", layout="wide"
 
 st.markdown("""
     <style>
-    .stApp { background-color: #ddaacc; }
+    .stApp { background-color: #fdf6e3; }
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
     .book-tile {
