@@ -447,16 +447,15 @@ elif not df.empty:
                         "If no matching concepts appear, reply strictly with the word 'NONE'."
                     )
                     
-                    # Using Groq's active production llama-3.3-70b-versatile engine
+                    # Switched to llama3-8b-8192 to safely bypass the free tier token limits
                     response = ai_client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model="llama3-8b-8192",
                         messages=[
                             {"role": "system", "content": system_instructions},
                             {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
                         ],
                         temperature=0.0
-                    )
-                    
+                    )                    
                     ai_result = response.choices[0].message.content.strip()
                     
                     if "NONE" not in ai_result:
