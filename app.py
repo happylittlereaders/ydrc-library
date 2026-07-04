@@ -447,9 +447,9 @@ elif not df.empty:
                         "If no matching concepts appear, reply strictly with the word 'NONE'."
                     )
                     
-                    # Switched to llama3-8b-8192 to safely bypass the free tier token limits
+                    # Switched to llama-3.1-8b-instant (Active model with a 250K TPM limit)
                     response = ai_client.chat.completions.create(
-                        model="llama3-8b-8192",
+                        model="llama-3.1-8b-instant",
                         messages=[
                             {"role": "system", "content": system_instructions},
                             {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
