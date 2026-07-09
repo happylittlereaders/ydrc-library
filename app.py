@@ -5,7 +5,8 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 import hashlib
 import re
-from openai import OpenAI  # Added for AI search support
+from sklearn.feature_extraction.text import TfidfVectorizer  # Added for AI search support without OpenAI
+from sklearn.metrics.pairwise import cosine_similarity       # Added for non-LLM vector matching
 
 # ==========================================
 # 1. Styles and Configuration
@@ -37,7 +38,7 @@ st.markdown("""
         text-align: center; box-shadow: 0 10px 25px rgba(255,110,64,0.15); margin: 15px 0;
     }
     .info-card { background: white; padding: 15px; border-radius: 12px; border-left: 6px solid #ff6e40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-   
+    
     .user-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; display: inline-block; }
     .badge-owner { background-color: #ffd700; color: #000; }
     .badge-admin { background-color: #ff6e40; color: #fff; }
@@ -62,10 +63,10 @@ def get_db_client():
     try:
         # Pull the dictionary from Streamlit Secrets
         key_dict = st.secrets["firestore"]
-       
+        
         # Create credentials from the dictionary
         creds = service_account.Credentials.from_service_account_info(key_dict)
-       
+        
         # Initialize the client with explicit project and database ID
         return firestore.Client(
             credentials=creds,
@@ -79,16 +80,13 @@ def get_db_client():
 # Global database instance
 db = get_db_client()
 
-# Initialize OpenAI client helper safely from secrets
+# AI Search Precomputation setup
 @st.cache_resource
-def get_openai_client():
-    try:
-        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    except Exception as e:
-        st.error(f"❌ OpenAI Key Initialization Error: {e}")
-        return None
-
-ai_client = get_openai_client()
+def train_search_engine(text_corpus):
+    """Fits the TF-IDF Vectorizer engine to the entire catalog context"""
+    vectorizer = TfidfVectorizer(stop_words='english', token_pattern=r'(?u)\b\w+\b')
+    tfidf_matrix = vectorizer.fit_transform(text_corpus)
+    return vectorizer, tfidf_matrix
 
 def make_hash(password):
     """Simple password hashing"""
@@ -110,11 +108,11 @@ def get_user_role(email):
     """Retrieve user role"""
     if db is None:
         return "guest"
-   
+    
     # Check if this is the owner email defined in secrets
     if email == st.secrets.get("owner_email", ""):
         return "owner"
-   
+    
     try:
         doc = db.collection("users").document(email).get()
         if doc.exists:
@@ -127,7 +125,7 @@ def register_user(email, password, nickname):
     if db is None:
         st.error("Database not connected.")
         return False
-       
+        
     # Basic validation to prevent empty documents (like in your screenshot)
     if not email or not password or not nickname:
         st.error("All fields are required for registration.")
@@ -138,10 +136,10 @@ def register_user(email, password, nickname):
         if doc_ref.get().exists:
             st.warning("This email is already registered.")
             return False
-       
+        
         # Determine role based on owner email
         role = "owner" if email == st.secrets.get("owner_email", "") else "user"
-       
+        
         doc_ref.set({
             "email": email,
             "password": make_hash(password),
@@ -159,7 +157,7 @@ def login_user(email, password):
     if db is None:
         st.error("Database connection is down.")
         return None
-       
+        
     if not email or not password:
         st.error("Please enter both email and password.")
         return None
@@ -189,7 +187,7 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUg
 def load_data():
     try:
         df = pd.read_csv(CSV_URL)
-       
+        
         # Mapping accounts for Column A (Timestamp) as Index 0
         c = {
             "il": 1,        # Col B: Interest Level
@@ -205,13 +203,13 @@ def load_data():
             "en": 12,       # Col M: ENGLISH Recommendation
             "cn": 13        # Col N: CHINESE Recommendation
         }
-       
+        
         # Convert AR level (Col H) - robust handling for strings or numbers
         df.iloc[:, c['ar']] = pd.to_numeric(
             df.iloc[:, c['ar']].astype(str).str.extract(r'(\d+\.?\d*)')[0],
             errors='coerce'
         ).fillna(0.0)
-       
+        
         # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
         # First convert to string to safely remove any commas/formatting, then back to numeric
         word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
@@ -224,7 +222,7 @@ def load_data():
         
         # Precompute string records so the AI engine can review titles, topics, and blurbs simultaneously
         def build_ai_context(row):
-            return f"Index: {row.name} | Title: {row.iloc[c['title']]} | Author: {row.iloc[c['author']]} | Topic: {row.iloc[c['topic']]} | Blurb: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
+            return f"{row.iloc[c['title']]} {row.iloc[c['author']]} {row.iloc[c['topic']]} {row.iloc[c['en']]} {row.iloc[c['cn']]}"
         
         df['_ai_context'] = df.apply(build_ai_context, axis=1)
        
@@ -234,6 +232,10 @@ def load_data():
         return pd.DataFrame(), {}
 
 df, idx = load_data()
+
+# Automatically build vector parameters if dataset loaded successfully
+if not df.empty:
+    vectorizer, tfidf_matrix = train_search_engine(df['_ai_context'])
 
 
 # ==========================================
@@ -456,7 +458,7 @@ if st.session_state.bk_focus is not None:
 # ==========================================
 elif not df.empty:
     with st.sidebar:
-        # Upgraded to intelligent AI search bar
+        # Upgraded to intelligent non-LLM vector search bar
         f_fuzzy = st.text_input("💡 **Smart AI Search**", placeholder="Enter concepts or keywords...")
         st.write("---")
         f_title = st.text_input("📖 Title")
@@ -473,44 +475,22 @@ elif not df.empty:
 
     f_df = df.copy()
     
-    # Process AI-driven context matching safely
+    # Process AI context matching via memory-safe matrix formulas
     if f_fuzzy.strip():
-        if ai_client is not None:
-            with st.spinner("🧠 AI scanning library context..."):
-                try:
-                    # Collect precalculated summary references from the spreadsheet row copies
-                    catalog_dump = "\n".join(f_df['_ai_context'].tolist())
-                    
-                    system_instructions = (
-                        "You are an optimized search database index tool for a book catalog. "
-                        "The user will search using conversational questions, descriptions, or general concepts. "
-                        "Scan the text rows provided, and decide which Row Index integers match their search requirements. "
-                        "Output ONLY a clean comma-separated sequence of matching index numbers (e.g., 4,12,31). "
-                        "If no matching concepts appear, reply strictly with the word 'NONE'."
-                    )
-                    
-                    response = ai_client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": system_instructions},
-                            {"role": "user", "content": f"Catalog:\n{catalog_dump}\n\nSearch: {f_fuzzy}"}
-                        ],
-                        temperature=0.0
-                    )
-                    
-                    ai_result = response.choices[0].message.content.strip()
-                    
-                    if "NONE" not in ai_result:
-                        matched_indices = [int(i.strip()) for i in ai_result.split(",") if i.strip().isdigit()]
-                        f_df = f_df.loc[f_df.index.isin(matched_indices)]
-                    else:
-                        f_df = pd.DataFrame(columns=f_df.columns)
-                except Exception as ai_err:
-                    st.sidebar.error(f"AI connection error, using word-match fallback: {ai_err}")
-                    f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
-        else:
-            # Fallback behavior if OpenAI client failed to load
-            f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+        with st.spinner("🧠 AI scanning library context..."):
+            try:
+                # Transform current input text to match catalog dimensions
+                query_vector = vectorizer.transform([f_fuzzy])
+                
+                # Math matrix calculations for content similarity scoring
+                scores = cosine_similarity(query_vector, tfidf_matrix).flatten()
+                
+                # Apply computed scores and filter by visibility overlap thresholds
+                f_df['search_score'] = scores
+                f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
+            except Exception as ai_err:
+                st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
+                f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
 
     # Preserve remaining sequential logic processing configurations
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
@@ -585,4 +565,3 @@ elif not df.empty:
                         if st.button("View Details", key=f"fav_{b_name}"):
                             st.session_state.bk_focus = title_to_idx[b_name]; st.rerun()
         else: st.info("No favorites yet, go click ❤️!")
-
