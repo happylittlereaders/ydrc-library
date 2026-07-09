@@ -211,7 +211,6 @@ def load_data():
         ).fillna(0.0)
         
         # Convert Word Count (Col I) - Cleaned to handle the dtype error correctly
-        # First convert to string to safely remove any commas/formatting, then back to numeric
         word_col_cleaned = df.iloc[:, c['word']].astype(str).str.replace(r'[^\d.]', '', regex=True)
         df.iloc[:, c['word']] = pd.to_numeric(
             word_col_cleaned,
@@ -220,9 +219,20 @@ def load_data():
         
         df = df.fillna(" ")
         
-        # Precompute string records so the AI engine can review titles, topics, and blurbs simultaneously
+        # Precompute string records - NOW INCLUDES EVERYTHING (including levels, quiz numbers, and word counts)
         def build_ai_context(row):
-            return f"{row.iloc[c['title']]} {row.iloc[c['author']]} {row.iloc[c['topic']]} {row.iloc[c['en']]} {row.iloc[c['cn']]}"
+            return (
+                f"Title: {row.iloc[c['title']]} | "
+                f"Author: {row.iloc[c['author']]} | "
+                f"Topic: {row.iloc[c['topic']]} | "
+                f"Genre: {row.iloc[c['fnf']]} | "
+                f"Series: {row.iloc[c['series']]} | "
+                f"Interest Level: {row.iloc[c['il']]} | "
+                f"AR Level: {row.iloc[c['ar']]} | "
+                f"Quiz: {row.iloc[c['quiz']]} | "
+                f"Words: {row.iloc[c['word']]} | "
+                f"Blurbs: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
+            )
         
         df['_ai_context'] = df.apply(build_ai_context, axis=1)
        
