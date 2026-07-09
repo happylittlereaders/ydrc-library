@@ -2,4 +2,4 @@ streamlit
 pandas
 google-cloud-firestore
 google-auth
-openai
+scikit-learn
