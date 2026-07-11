@@ -198,7 +198,7 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Fixed for Dtype and Series Errors + Open Library Cover Fetch)
+# 4. Data Loading
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUguEHbuv0XQfdW5M/export?format=csv&gid=897583843"
 
@@ -214,7 +214,7 @@ def fetch_openlibrary_cover(title, author):
                     return f"https://covers.openlibrary.org/b/id/{doc['cover_i']}-M.jpg"
     except:
         pass
-    return "https://via.placeholder.com/150x210?text=No+Cover"
+    return ""  # Return empty string instead of a broken placeholder URL link
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -441,7 +441,18 @@ if st.session_state.bk_focus is not None:
     side_c1, side_c2 = st.columns([1, 3])
     
     with side_c1:
-        st.image(row['_cover_url'], use_container_width=True)
+        if row['_cover_url']:
+            st.image(row['_cover_url'], use_container_width=True)
+        else:
+            st.markdown("""
+            <div style="width: 100%; height: 320px; background-color: #f0f2f6; 
+                        border: 2px dashed #cccccc; border-radius: 12px; 
+                        display: flex; flex-direction: column; align-items: center; justify-content: center; 
+                        color: #777777; font-size: 1em; font-weight: bold; text-align: center; padding: 20px; box-sizing: border-box;">
+                <div>📚</div>
+                <div style="margin-top: 10px;">No Book Cover Available</div>
+            </div>
+            """, unsafe_allow_html=True)
         
     with side_c2:
         c1, c2, c3 = st.columns(3)
@@ -464,8 +475,8 @@ if st.session_state.bk_focus is not None:
     lb1, lb2, _ = st.columns([1,1,2])
     
     # Swapped Buttons layout configuration preserved safely
-    if lb1.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
-    if lb2.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
+    if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
+    if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
     
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
@@ -606,12 +617,24 @@ elif not df.empty:
                     voted = t in st.session_state.voted
                     cover_img_link = row['_cover_url']
                     
-                    # MODIFIED: Embedded an aesthetic image cover container directly into the tile preview
+                    # Interchange layout checking condition block for text cover fallback alignment
+                    if cover_img_link:
+                        cover_html = f'<img class="cover-img" src="{cover_img_link}">'
+                    else:
+                        cover_html = """
+                        <div style="width: 100%; height: 140px; background-color: #f0f2f6; 
+                                    border: 1px dashed #cccccc; border-radius: 6px; 
+                                    display: flex; align-items: center; justify-content: center; 
+                                    color: #777777; font-size: 0.85em; font-weight: 500; text-align: center; padding: 10px; box-sizing: border-box;">
+                            No Book Cover Available
+                        </div>
+                        """
+                    
                     st.markdown(f"""
                     <div class="book-tile">
                         <div>
                             <div class="cover-container">
-                                <img class="cover-img" src="{cover_img_link}">
+                                {cover_html}
                             </div>
                             <div class="tile-title">《{t}》</div>
                             <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
