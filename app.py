@@ -256,10 +256,10 @@ def load_data():
         def build_ai_context(row):
             return (
                 f"Title: {row.iloc[c['title']]} | "
-#               f"Author: {row.iloc[c['author']]} | "
+                f"Author: {row.iloc[c['author']]} | "
                 f"Topic: {row.iloc[c['topic']]} | "
 #               f"Genre: {row.iloc[c['fnf']]} | "
-#               f"Series: {row.iloc[c['series']]} | "
+                f"Series: {row.iloc[c['series']]} | "
 #               f"Interest Level: {row.iloc[c['il']]} | "
 #               f"AR Level: {row.iloc[c['ar']]} | "
 #               f"Quiz: {row.iloc[c['quiz']]} | "
@@ -550,7 +550,7 @@ elif not df.empty:
                 
                 # Apply computed scores and filter by visibility overlap thresholds
                 f_df['search_score'] = scores
-                f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
+                f_df = f_df[f_df['search_score'] > 0].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
                 st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
                 f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
