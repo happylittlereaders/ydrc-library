@@ -5,6 +5,7 @@ from google.cloud import firestore
 from google.oauth2 import service_account
 import hashlib
 import re
+import requests
 from sklearn.feature_extraction.text import TfidfVectorizer  # Added for AI search support without OpenAI
 from sklearn.metrics.pairwise import cosine_similarity       # Added for non-LLM vector matching
 
@@ -19,10 +20,10 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
     
-    /* FIX: Set fixed height to ensure rows never misalign when titles wrap */
+    /* MODIFIED: Increased tile height to 400px to perfectly fit book covers alongside text tags */
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 260px; box-sizing: border-box;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 400px; box-sizing: border-box;
         display: flex; flex-direction: column; justify-content: space-between;
     }
     
@@ -31,6 +32,14 @@ st.markdown("""
         color: #1e3d59; font-size: 1.1em; font-weight: bold; margin-bottom: 4px; 
         line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
         overflow: hidden; overflow-wrap: break-word; word-wrap: break-word;
+    }
+    
+    /* Added CSS class layout for book cover containment */
+    .cover-container {
+        display: flex; justify-content: center; align-items: center; margin-bottom: 10px; height: 140px;
+    }
+    .cover-img {
+        max-height: 140px; max-width: 100%; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); object-fit: contain;
     }
     
     .tag-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
@@ -189,9 +198,23 @@ def login_user(email, password):
 
 
 # ==========================================
-# 4. Data Loading (Fixed for Dtype and Series Errors)
+# 4. Data Loading (Fixed for Dtype and Series Errors + Open Library Cover Fetch)
 # ==========================================
 CSV_URL = "https://docs.google.com/spreadsheets/d/1wqamTRHb2vUHU_JXFq38NlYy6uQUguEHbuv0XQfdW5M/export?format=csv&gid=897583843"
+
+def fetch_openlibrary_cover(title, author):
+    """Utility function to query Open Library API for book artwork dynamically"""
+    try:
+        query = f"{title} {author}".replace(" ", "+")
+        api_url = f"https://openlibrary.org/search.json?q={query}"
+        res = requests.get(api_url, timeout=4).json()
+        if res.get("docs"):
+            for doc in res["docs"]:
+                if "cover_i" in doc:
+                    return f"https://covers.openlibrary.org/b/id/{doc['cover_i']}-M.jpg"
+    except:
+        pass
+    return "https://via.placeholder.com/150x210?text=No+Cover"
 
 @st.cache_data(ttl=600)
 def load_data():
@@ -245,6 +268,14 @@ def load_data():
             )
          
         df['_ai_context'] = df.apply(build_ai_context, axis=1)
+        
+        # Pull Cover Image URLs in batch loop (Cached inside function)
+        cover_urls = []
+        for _, row in df.iterrows():
+            t_val = row.iloc[c['title']]
+            a_val = row.iloc[c['author']]
+            cover_urls.append(fetch_openlibrary_cover(t_val, a_val))
+        df['_cover_url'] = cover_urls
         
         return df, c
     except Exception as e:
@@ -406,26 +437,33 @@ if st.session_state.bk_focus is not None:
     
     st.markdown(f"# 📖 {title_key}")
     
-    c1, c2, c3 = st.columns(3)
-    infos = [
-        ("👤 Author", row.iloc[idx['author']]),
-        ("📚 Genre", row.iloc[idx['fnf']]),
-        ("🎯 Interest Level", row.iloc[idx['il']]),
-        ("📊 ATOS Book Level", row.iloc[idx['ar']]),
-        ("🔢 Quiz No.", row.iloc[idx['quiz']]),
-        ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
-        ("🔗 Series", row.iloc[idx['series']]),
-        ("🏷️ Topic", row.iloc[idx['topic']]),
-        ("🙋 Recommender", row.iloc[idx['rec']])
-    ]
-    for i, (l, v) in enumerate(infos):
-        with [c1, c2, c3][i % 3]:
-            st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
+    # Split layout into Book Cover artwork side vs info matrix cards side
+    side_c1, side_c2 = st.columns([1, 3])
+    
+    with side_c1:
+        st.image(row['_cover_url'], use_container_width=True)
+        
+    with side_c2:
+        c1, c2, c3 = st.columns(3)
+        infos = [
+            ("👤 Author", row.iloc[idx['author']]),
+            ("📚 Genre", row.iloc[idx['fnf']]),
+            ("🎯 Interest Level", row.iloc[idx['il']]),
+            ("📊 ATOS Book Level", row.iloc[idx['ar']]),
+            ("🔢 Quiz No.", row.iloc[idx['quiz']]),
+            ("📝 Word Count", f"{row.iloc[idx['word']]:,}"),
+            ("🔗 Series", row.iloc[idx['series']]),
+            ("🏷️ Topic", row.iloc[idx['topic']]),
+            ("🙋 Recommender", row.iloc[idx['rec']])
+        ]
+        for i, (l, v) in enumerate(infos):
+            with [c1, c2, c3][i % 3]:
+                st.markdown(f'<div class="info-card"><small>{l}</small><br><b>{v}</b></div>', unsafe_allow_html=True)
 
     st.write("#### 🌟 Recommendation Details")
     lb1, lb2, _ = st.columns([1,1,2])
     
-    # SWAPPED BUTTONS: English is now first, Chinese is second
+    # Swapped Buttons layout configuration preserved safely
     if lb1.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
     if lb2.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     
@@ -512,7 +550,7 @@ elif not df.empty:
                 f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
                 st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
-                f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
+                f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
 
     # Preserve remaining sequential logic processing configurations
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
@@ -566,11 +604,15 @@ elif not df.empty:
                 with cols[i % 3]:
                     t = row.iloc[idx['title']]
                     voted = t in st.session_state.voted
+                    cover_img_link = row['_cover_url']
                     
-                    # Renders using safe CSS class layouts linked up to Section 1 rules
+                    # MODIFIED: Embedded an aesthetic image cover container directly into the tile preview
                     st.markdown(f"""
                     <div class="book-tile">
                         <div>
+                            <div class="cover-container">
+                                <img class="cover-img" src="{cover_img_link}">
+                            </div>
                             <div class="tile-title">《{t}》</div>
                             <div style="color:#666; font-size:0.85em; margin-bottom:10px;">{row.iloc[idx["author"]]}</div>
                         </div>
