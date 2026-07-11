@@ -531,7 +531,7 @@ elif not df.empty:
             st.info("No matching books discovered. Try adjusting your query keywords or range limits.")
         else:
             # 📄 PAGINATION CONFIGURATION
-            BOOKS_PER_PAGE = 12  # Change this number to show more or fewer books per page
+            BOOKS_PER_PAGE = 12  
             
             if 'current_page' not in st.session_state:
                 st.session_state.current_page = 0
@@ -539,59 +539,11 @@ elif not df.empty:
             total_books = len(f_df)
             total_pages = (total_books - 1) // BOOKS_PER_PAGE + 1
             
-            # Defensive check: make sure current page doesn't exceed total pages
+            # Guardrail context checking
             if st.session_state.current_page >= total_pages:
                 st.session_state.current_page = 0
 
-            # --- ADVANCED NAVIGATION BAR (TOP) ---
-            st.write("---")
-            nav_cols = st.columns([0.5, 0.5, 1.2, 2.5, 0.5, 0.5])
-            
-            # Button: First Page (<<)
-            if nav_cols[0].button("<<", key="btn_first", use_container_width=True, disabled=(st.session_state.current_page == 0)):
-                st.session_state.current_page = 0
-                st.rerun()
-                
-            # Button: Previous Page (<)
-            if nav_cols[1].button("<", key="btn_prev", use_container_width=True, disabled=(st.session_state.current_page == 0)):
-                st.session_state.current_page -= 1
-                st.rerun()
-                
-            # Direct Entry Box (User types page number)
-            with nav_cols[2]:
-                input_page = st.number_input(
-                    "Go to page:", 
-                    min_value=1, 
-                    max_value=total_pages, 
-                    value=st.session_state.current_page + 1, 
-                    step=1,
-                    label_visibility="collapsed",
-                    key="page_input"
-                )
-                # If the entered number differs from session state, update it
-                if input_page - 1 != st.session_state.current_page:
-                    st.session_state.current_page = input_page - 1
-                    st.rerun()
-            
-            # Text Status display: "Page X of Y (Z total books)"
-            with nav_cols[3]:
-                st.markdown(
-                    f"<p style='font-size: 1.05em; padding-top: 5px; margin: 0;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} &nbsp;&nbsp;•&nbsp;&nbsp; ({total_books} total books)</p>", 
-                    unsafe_allow_html=True
-                )
-                
-            # Button: Next Page (>)
-            if nav_cols[4].button(">", key="btn_next", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1)):
-                st.session_state.current_page += 1
-                st.rerun()
-                
-            # Button: Last Page (>>)
-            if nav_cols[5].button(">>", key="btn_last", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1)):
-                st.session_state.current_page = total_pages - 1
-                st.rerun()
-            st.write("---")
-
-            # Slice the dataset according to calculations
+            # Slice current views
             start_idx = st.session_state.current_page * BOOKS_PER_PAGE
             end_idx = min(start_idx + BOOKS_PER_PAGE, total_books)
             page_chunk = f_df.iloc[start_idx:end_idx]
@@ -624,6 +576,37 @@ elif not df.empty:
                    
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
+
+            # --- PAGINATION CONTROLS AT THE BOTTOM ---
+            st.write("---")
+            
+            # Define isolated button click callbacks to fix state collisions
+            def go_first(): st.session_state.current_page = 0
+            def go_prev(): st.session_state.current_page -= 1
+            def go_next(): st.session_state.current_page += 1
+            def go_last(): st.session_state.current_page = total_pages - 1
+            
+            nav_cols = st.columns([0.5, 0.5, 1.2, 2.5, 0.5, 0.5])
+            
+            nav_cols[0].button("<<", key="b_first", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_first)
+            nav_cols[1].button("<", key="b_prev", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_prev)
+            
+            with nav_cols[2]:
+                # Step 0 layout parameters removes the + and - click triggers
+                input_page = st.number_input(
+                    "Go to page:", min_value=1, max_value=total_pages, 
+                    value=st.session_state.current_page + 1, step=0,
+                    label_visibility="collapsed", key="direct_page_box"
+                )
+                if input_page - 1 != st.session_state.current_page:
+                    st.session_state.current_page = input_page - 1
+                    st.rerun()
+                    
+            with nav_cols[3]:
+                st.markdown(f"<p style='font-size: 1.05em; padding-top: 5px; margin: 0;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} &nbsp;&nbsp;•&nbsp;&nbsp; ({total_books} total books)</p>", unsafe_allow_html=True)
+                
+            nav_cols[4].button(">", key="b_next", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_next)
+            nav_cols[5].button(">>", key="b_last", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_last)
 
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
