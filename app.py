@@ -256,14 +256,14 @@ def load_data():
         def build_ai_context(row):
             return (
                 f"Title: {row.iloc[c['title']]} | "
-                f"Author: {row.iloc[c['author']]} | "
+#               f"Author: {row.iloc[c['author']]} | "
                 f"Topic: {row.iloc[c['topic']]} | "
-                f"Genre: {row.iloc[c['fnf']]} | "
-                f"Series: {row.iloc[c['series']]} | "
-                f"Interest Level: {row.iloc[c['il']]} | "
-                f"AR Level: {row.iloc[c['ar']]} | "
-                f"Quiz: {row.iloc[c['quiz']]} | "
-                f"Words: {row.iloc[c['word']]} | "
+#               f"Genre: {row.iloc[c['fnf']]} | "
+#               f"Series: {row.iloc[c['series']]} | "
+#               f"Interest Level: {row.iloc[c['il']]} | "
+#               f"AR Level: {row.iloc[c['ar']]} | "
+#               f"Quiz: {row.iloc[c['quiz']]} | "
+#               f"Words: {row.iloc[c['word']]} | "
                 f"Blurbs: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
             )
          
