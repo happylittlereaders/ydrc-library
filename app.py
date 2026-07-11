@@ -539,7 +539,7 @@ elif not df.empty:
             total_books = len(f_df)
             total_pages = (total_books - 1) // BOOKS_PER_PAGE + 1
             
-            # Guardrail context checking
+            # Guardrail context resetting
             if st.session_state.current_page >= total_pages:
                 st.session_state.current_page = 0
 
@@ -580,7 +580,7 @@ elif not df.empty:
             # --- PAGINATION CONTROLS AT THE BOTTOM ---
             st.write("---")
             
-            # Define isolated button click callbacks to fix state collisions
+            # Use state management handlers to bypass state collision issues
             def go_first(): st.session_state.current_page = 0
             def go_prev(): st.session_state.current_page -= 1
             def go_next(): st.session_state.current_page += 1
@@ -592,15 +592,20 @@ elif not df.empty:
             nav_cols[1].button("<", key="b_prev", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_prev)
             
             with nav_cols[2]:
-                # Step 0 layout parameters removes the + and - click triggers
-                input_page = st.number_input(
-                    "Go to page:", min_value=1, max_value=total_pages, 
-                    value=st.session_state.current_page + 1, step=0,
-                    label_visibility="collapsed", key="direct_page_box"
+                # Text input avoids the native HTML stepper toggles (+ and -) completely
+                typed_val = st.text_input(
+                    label="Go to page input",
+                    value=str(st.session_state.current_page + 1),
+                    label_visibility="collapsed",
+                    key="direct_page_box"
                 )
-                if input_page - 1 != st.session_state.current_page:
-                    st.session_state.current_page = input_page - 1
-                    st.rerun()
+                if typed_val.isdigit():
+                    parsed_val = int(typed_val)
+                    if 1 <= parsed_val <= total_pages:
+                        target_page = parsed_val - 1
+                        if target_page != st.session_state.current_page:
+                            st.session_state.current_page = target_page
+                            st.rerun()
                     
             with nav_cols[3]:
                 st.markdown(f"<p style='font-size: 1.05em; padding-top: 5px; margin: 0;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} &nbsp;&nbsp;•&nbsp;&nbsp; ({total_books} total books)</p>", unsafe_allow_html=True)
