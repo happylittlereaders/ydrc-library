@@ -444,15 +444,7 @@ if st.session_state.bk_focus is not None:
         if row['_cover_url']:
             st.image(row['_cover_url'], use_container_width=True)
         else:
-            st.markdown("""
-            <div style="width: 100%; height: 320px; background-color: #f0f2f6; 
-                        border: 2px dashed #cccccc; border-radius: 12px; 
-                        display: flex; flex-direction: column; align-items: center; justify-content: center; 
-                        color: #777777; font-size: 1em; font-weight: bold; text-align: center; padding: 20px; box-sizing: border-box;">
-                <div>📚</div>
-                <div style="margin-top: 10px;">No Book Cover Available</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("""<div style="width:100%; height:320px; background-color:#f0f2f6; border:2px dashed #cccccc; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#777777; font-size:1em; font-weight:bold; text-align:center; padding:20px; box-sizing:border-box;"><div>📚</div><div style="margin-top:10px;">No Book Cover Available</div></div>""", unsafe_allow_html=True)
         
     with side_c2:
         c1, c2, c3 = st.columns(3)
@@ -617,18 +609,11 @@ elif not df.empty:
                     voted = t in st.session_state.voted
                     cover_img_link = row['_cover_url']
                     
-                    # Interchange layout checking condition block for text cover fallback alignment
+                    # FIX: Keep fallback block flat on one line to ensure text isn't treated as plain markdown code text
                     if cover_img_link:
                         cover_html = f'<img class="cover-img" src="{cover_img_link}">'
                     else:
-                        cover_html = """
-                        <div style="width: 100%; height: 140px; background-color: #f0f2f6; 
-                                    border: 1px dashed #cccccc; border-radius: 6px; 
-                                    display: flex; align-items: center; justify-content: center; 
-                                    color: #777777; font-size: 0.85em; font-weight: 500; text-align: center; padding: 10px; box-sizing: border-box;">
-                            No Book Cover Available
-                        </div>
-                        """
+                        cover_html = '<div style="width:100%; height:140px; background-color:#f0f2f6; border:1px dashed #cccccc; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#777777; font-size:0.85em; font-weight:500; text-align:center; padding:10px; box-sizing:border-box;">No Book Cover Available</div>'
                     
                     st.markdown(f"""
                     <div class="book-tile">
