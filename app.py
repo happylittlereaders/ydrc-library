@@ -424,8 +424,10 @@ if st.session_state.bk_focus is not None:
 
     st.write("#### 🌟 Recommendation Details")
     lb1, lb2, _ = st.columns([1,1,2])
-    if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
-    if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
+    
+    # SWAPPED BUTTONS: English is now first, Chinese is second
+    if lb1.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
+    if lb2.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     
     content = row.iloc[idx["cn"]] if st.session_state.lang_mode=="CN" else row.iloc[idx["en"]]
     st.markdown(f'<div style="background:#fffcf5; padding:25px; border-radius:15px; border:2px dashed #ff6e40;">{content}</div>', unsafe_allow_html=True)
@@ -510,7 +512,7 @@ elif not df.empty:
                 f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
                 st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
-                f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
+                f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
 
     # Preserve remaining sequential logic processing configurations
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
@@ -581,13 +583,13 @@ elif not df.empty:
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                   
+                    
                     cl, cr = st.columns(2)
                     if cl.button("❤️" if voted else "🤍", key=f"h_{orig_idx}", use_container_width=True):
                         if voted: st.session_state.voted.remove(t)
                         else: st.session_state.voted.add(t)
                         st.rerun()
-                   
+                    
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
 
