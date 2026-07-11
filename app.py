@@ -577,7 +577,7 @@ elif not df.empty:
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
 
-            # --- CLEAN TEXT-BASED PAGINATION CONTROLS AT THE BOTTOM ---
+            # --- NAVIGATION AND TEXT BOX ROW AT THE BOTTOM ---
             st.write("---")
             
             # Isolated callback state functions to guarantee action routing
@@ -586,16 +586,34 @@ elif not df.empty:
             def go_next(): st.session_state.current_page += 1
             def go_last(): st.session_state.current_page = total_pages - 1
             
-            nav_cols = st.columns([1, 1, 4, 1, 1])
+            # 7 columns to give plenty of room for text inputs and buttons
+            nav_cols = st.columns([1, 1, 1.2, 0.6, 3.2, 1, 1])
             
             nav_cols[0].button("First", key="b_first", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_first)
             nav_cols[1].button("Previous", key="b_prev", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_prev)
             
+            # Text input without + and -
             with nav_cols[2]:
-                st.markdown(f"<p style='text-align: center; font-size: 1.05em; padding-top: 5px; margin: 0;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} &nbsp;&nbsp;•&nbsp;&nbsp; ({total_books} total books)</p>", unsafe_allow_html=True)
+                typed_val = st.text_input(
+                    label="Go to page input",
+                    value=str(st.session_state.current_page + 1),
+                    label_visibility="collapsed",
+                    key="direct_page_box"
+                )
+            
+            # A clean click button to execute the typed page change immediately
+            if nav_cols[3].button("Go", key="b_go", use_container_width=True):
+                if typed_val.isdigit():
+                    parsed_val = int(typed_val)
+                    if 1 <= parsed_val <= total_pages:
+                        st.session_state.current_page = parsed_val - 1
+                        st.rerun()
+            
+            with nav_cols[4]:
+                st.markdown(f"<p style='text-align: left; font-size: 1.05em; padding-top: 5px; margin: 0; padding-left: 10px;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} &nbsp;&nbsp;•&nbsp;&nbsp; ({total_books} total books)</p>", unsafe_allow_html=True)
                 
-            nav_cols[3].button("Next", key="b_next", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_next)
-            nav_cols[4].button("Last", key="b_last", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_last)
+            nav_cols[5].button("Next", key="b_next", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_next)
+            nav_cols[6].button("Last", key="b_last", use_container_width=True, disabled=(st.session_state.current_page >= total_pages - 1), on_click=go_last)
 
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
