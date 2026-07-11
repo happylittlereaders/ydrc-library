@@ -530,8 +530,26 @@ elif not df.empty:
         if f_df.empty:
             st.info("No matching books discovered. Try adjusting your query keywords or range limits.")
         else:
+            # 📄 PAGINATION CONFIGURATION
+            BOOKS_PER_PAGE = 12  # Change this number to show more or fewer books per page
+            
+            if 'current_page' not in st.session_state:
+                st.session_state.current_page = 0
+                
+            total_books = len(f_df)
+            total_pages = (total_books - 1) // BOOKS_PER_PAGE + 1
+            
+            # Defensive check: make sure current page doesn't exceed new search totals
+            if st.session_state.current_page >= total_pages:
+                st.session_state.current_page = 0
+
+            start_idx = st.session_state.current_page * BOOKS_PER_PAGE
+            end_idx = min(start_idx + BOOKS_PER_PAGE, total_books)
+            page_chunk = f_df.iloc[start_idx:end_idx]
+
+            # Display the grid of books for the current page chunk
             cols = st.columns(3)
-            for i, (orig_idx, row) in enumerate(f_df.iterrows()):
+            for i, (orig_idx, row) in enumerate(page_chunk.iterrows()):
                 with cols[i % 3]:
                     t = row.iloc[idx['title']]
                     voted = t in st.session_state.voted
@@ -557,6 +575,23 @@ elif not df.empty:
                    
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
+
+            # 🧭 PAGINATION CONTROLS
+            st.write("---")
+            p_col1, p_col2, p_col3 = st.columns([1, 2, 1])
+            
+            with p_col1:
+                if st.button("⬅️ Previous", disabled=(st.session_state.current_page == 0), use_container_width=True):
+                    st.session_state.current_page -= 1
+                    st.rerun()
+            
+            with p_col2:
+                st.markdown(f"<p style='text-align: center; font-size: 1.1em; padding-top: 5px;'>Page <b>{st.session_state.current_page + 1}</b> of {total_pages} ({total_books} books total)</p>", unsafe_allow_html=True)
+            
+            with p_col3:
+                if st.button("Next ➡️", disabled=(st.session_state.current_page >= total_pages - 1), use_container_width=True):
+                    st.session_state.current_page += 1
+                    st.rerun()
 
     with tab2:
         st.subheader("📊 ATOS Book Level Distribution")
