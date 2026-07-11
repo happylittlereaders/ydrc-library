@@ -19,16 +19,18 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e6e9ef; }
     .sidebar-title { color: #1e3d59; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #1e3d59; margin-bottom: 15px; }
     
-    /* Updated for dynamic, matching vertical flex grid structures */
+    /* FIX: Set fixed height to ensure rows never misalign when titles wrap */
     .book-tile {
         background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2d1b0;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 240px; height: 100%;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 260px; box-sizing: border-box;
         display: flex; flex-direction: column; justify-content: space-between;
     }
-    /* FIX: Swapped out height restrictions for safety auto-wrapping attributes */
+    
+    /* FIX: Support auto-wrapping up to 3 lines, then gracefully truncate with ellipses if text overflows */
     .tile-title { 
-        color: #1e3d59; font-size: 1.1em; font-weight: bold; margin-bottom: 8px; 
-        line-height: 1.3; min-height: 60px; overflow-wrap: break-word; word-wrap: break-word;
+        color: #1e3d59; font-size: 1.1em; font-weight: bold; margin-bottom: 4px; 
+        line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+        overflow: hidden; overflow-wrap: break-word; word-wrap: break-word;
     }
     
     .tag-container { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
@@ -563,7 +565,7 @@ elif not df.empty:
                     t = row.iloc[idx['title']]
                     voted = t in st.session_state.voted
                     
-                    # Updated card container styling to explicitly leverage flex-wrapping mechanics
+                    # Renders using safe CSS class layouts linked up to Section 1 rules
                     st.markdown(f"""
                     <div class="book-tile">
                         <div>
