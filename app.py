@@ -577,7 +577,7 @@ elif not df.empty:
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
 
-            # --- NAVIGATION AND TEXT BOX ROW AT THE BOTTOM ---
+            # --- NAVIGATION AND TEXT BOX ROW AT THE BOTTOM (FIXED WIDTH) ---
             st.write("---")
             
             # Isolated callback state functions to guarantee action routing
@@ -586,8 +586,8 @@ elif not df.empty:
             def go_next(): st.session_state.current_page += 1
             def go_last(): st.session_state.current_page = total_pages - 1
             
-            # 7 columns to give plenty of room for text inputs and buttons
-            nav_cols = st.columns([1, 1, 1.2, 0.6, 3.2, 1, 1])
+            # Optimized column spacing ratios to perfectly fit everything on one line
+            nav_cols = st.columns([1, 1.2, 1, 1, 3.8, 1, 1])
             
             nav_cols[0].button("First", key="b_first", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_first)
             nav_cols[1].button("Previous", key="b_prev", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_prev)
@@ -601,7 +601,7 @@ elif not df.empty:
                     key="direct_page_box"
                 )
             
-            # A clean click button to execute the typed page change immediately
+            # Safely triggers changes with direct layout padding protection
             if nav_cols[3].button("Go", key="b_go", use_container_width=True):
                 if typed_val.isdigit():
                     parsed_val = int(typed_val)
