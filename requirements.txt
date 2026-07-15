@@ -2,4 +2,6 @@ streamlit
 pandas
 google-cloud-firestore
 google-auth
-scikit-learn
+requests
+sentence-transformers
+torch
