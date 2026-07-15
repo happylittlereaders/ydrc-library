@@ -6,8 +6,8 @@ from google.oauth2 import service_account
 import hashlib
 import re
 import requests
-from sklearn.feature_extraction.text import TfidfVectorizer  # Added for AI search support without OpenAI
-from sklearn.metrics.pairwise import cosine_similarity       # Added for non-LLM vector matching
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # ==========================================
 # 1. Styles and Configuration
@@ -99,13 +99,13 @@ def get_db_client():
 # Global database instance
 db = get_db_client()
 
-# AI Search Precomputation setup
+# NLP Semantic Search Precomputation setup
 @st.cache_resource
-def train_search_engine(text_corpus):
-    """Fits the TF-IDF Vectorizer engine to the entire catalog context"""
-    vectorizer = TfidfVectorizer(stop_words='english', token_pattern=r'(?u)\b\w+\b')
-    tfidf_matrix = vectorizer.fit_transform(text_corpus)
-    return vectorizer, tfidf_matrix
+def load_nlp_search_engine(text_corpus):
+    """Loads a pre-trained Transformer model and encodes the book catalog"""
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    corpus_embeddings = model.encode(text_corpus, show_progress_bar=False)
+    return model, corpus_embeddings
 
 def make_hash(password):
     """Simple password hashing"""
@@ -286,7 +286,7 @@ df, idx = load_data()
 
 # Automatically build vector parameters if dataset loaded successfully
 if not df.empty:
-    vectorizer, tfidf_matrix = train_search_engine(df['_ai_context'])
+    nlp_model, corpus_embeddings = load_nlp_search_engine(df['_ai_context'].tolist())
 
 
 # ==========================================
@@ -538,21 +538,22 @@ elif not df.empty:
 
     f_df = df.copy()
     
-    # Process AI context matching via memory-safe matrix formulas
+    # Process NLP Semantic Search matching
     if f_fuzzy.strip():
-        with st.spinner("🧠 AI scanning library context..."):
+        with st.spinner("🧠 NLP model understanding your query..."):
             try:
-                # Transform current input text to match catalog dimensions
-                query_vector = vectorizer.transform([f_fuzzy])
+                # Encode the user's natural language search query into an embedding vector
+                query_embedding = nlp_model.encode([f_fuzzy])
                 
-                # Math matrix calculations for content similarity scoring
-                scores = cosine_similarity(query_vector, tfidf_matrix).flatten()
+                # Calculate semantic similarity between user query and all books
+                scores = cosine_similarity(query_embedding, corpus_embeddings).flatten()
                 
-                # Apply computed scores and filter by visibility overlap thresholds
+                # Apply computed semantic scores
                 f_df['search_score'] = scores
-                f_df = f_df[f_df['search_score'] > 0.05].sort_values(by='search_score', ascending=False)
+                # Filter out completely unrelated books (similarity threshold 0.15 - 0.25 is typical for NLP)
+                f_df = f_df[f_df['search_score'] > 0.20].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
-                st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
+                st.sidebar.error(f"NLP search error: {ai_err}")
                 f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
 
     # Preserve remaining sequential logic processing configurations
@@ -698,4 +699,3 @@ elif not df.empty:
                         if st.button("View Details", key=f"fav_{b_name}"):
                             st.session_state.bk_focus = title_to_idx[b_name]; st.rerun()
         else: st.info("No favorites yet, go click ❤️!")
-
