@@ -6,8 +6,8 @@ from google.oauth2 import service_account
 import hashlib
 import re
 import requests
-from sklearn.feature_extraction.text import TfidfVectorizer  # Added for AI search support without OpenAI
-from sklearn.metrics.pairwise import cosine_similarity       # Added for non-LLM vector matching
+from sentence_transformers import SentenceTransformer, util
+import torch
 
 # ==========================================
 # 1. Styles and Configuration
@@ -99,13 +99,18 @@ def get_db_client():
 # Global database instance
 db = get_db_client()
 
-# AI Search Precomputation setup
+# AI Semantic Search Setup
 @st.cache_resource
-def train_search_engine(text_corpus):
-    """Fits the TF-IDF Vectorizer engine to the entire catalog context"""
-    vectorizer = TfidfVectorizer(stop_words='english', token_pattern=r'(?u)\b\w+\b')
-    tfidf_matrix = vectorizer.fit_transform(text_corpus)
-    return vectorizer, tfidf_matrix
+def load_nlp_model():
+    """Loads the lightweight semantic search transformer"""
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+model = load_nlp_model()
+
+@st.cache_data
+def compute_library_embeddings(_model, text_corpus):
+    """Converts your catalog text into multi-dimensional NLP vector embeddings"""
+    return _model.encode(text_corpus, convert_to_tensor=True)
 
 def make_hash(password):
     """Simple password hashing"""
@@ -145,7 +150,7 @@ def register_user(email, password, nickname):
         st.error("Database not connected.")
         return False
          
-    # Basic validation to prevent empty documents (like in your screenshot)
+    # Basic validation to prevent empty documents
     if not email or not password or not nickname:
         st.error("All fields are required for registration.")
         return False
@@ -192,7 +197,6 @@ def login_user(email, password):
         else:
             st.error("User does not exist.")
     except Exception as e:
-        # This will catch the 404 if the project/database ID is still wrong
         st.error(f"Login error: {e}")
     return None
 
@@ -252,18 +256,13 @@ def load_data():
          
         df = df.fillna(" ")
          
-        # Precompute string records - NOW INCLUDES EVERYTHING (including levels, quiz numbers, and word counts)
+        # Precompute string records
         def build_ai_context(row):
             return (
                 f"Title: {row.iloc[c['title']]} | "
                 f"Author: {row.iloc[c['author']]} | "
                 f"Topic: {row.iloc[c['topic']]} | "
-#               f"Genre: {row.iloc[c['fnf']]} | "
                 f"Series: {row.iloc[c['series']]} | "
-#               f"Interest Level: {row.iloc[c['il']]} | "
-#               f"AR Level: {row.iloc[c['ar']]} | "
-#               f"Quiz: {row.iloc[c['quiz']]} | "
-#               f"Words: {row.iloc[c['word']]} | "
                 f"Blurbs: {row.iloc[c['en']]} {row.iloc[c['cn']]}"
             )
          
@@ -286,7 +285,7 @@ df, idx = load_data()
 
 # Automatically build vector parameters if dataset loaded successfully
 if not df.empty:
-    vectorizer, tfidf_matrix = train_search_engine(df['_ai_context'])
+    library_embeddings = compute_library_embeddings(model, df['_ai_context'].tolist())
 
 
 # ==========================================
@@ -466,7 +465,6 @@ if st.session_state.bk_focus is not None:
     st.write("#### 🌟 Recommendation Details")
     lb1, lb2, _ = st.columns([1,1,2])
     
-    # Swapped Buttons layout configuration preserved safely
     if lb1.button("CN 中文理由", use_container_width=True): st.session_state.lang_mode = "CN"; st.rerun()
     if lb2.button("US English", use_container_width=True): st.session_state.lang_mode = "EN"; st.rerun()
     
@@ -521,8 +519,8 @@ if st.session_state.bk_focus is not None:
 # ==========================================
 elif not df.empty:
     with st.sidebar:
-        # Upgraded to intelligent non-LLM vector search bar
-        f_fuzzy = st.text_input("💡 **Smart AI Search**", placeholder="Enter concepts or keywords...")
+        # Upgraded to intelligent non-LLM vector search bar using Sentence Transformers
+        f_fuzzy = st.text_input("💡 **Smart AI Search**", placeholder="Search concepts (e.g. fantasy adventure)...")
         st.write("---")
         f_title = st.text_input("📖 Title")
         f_author = st.text_input("👤 Author")
@@ -538,24 +536,24 @@ elif not df.empty:
 
     f_df = df.copy()
     
-    # Process AI context matching via memory-safe matrix formulas
+    # NLP Semantic Search
     if f_fuzzy.strip():
         with st.spinner("🧠 AI scanning library context..."):
             try:
-                # Transform current input text to match catalog dimensions
-                query_vector = vectorizer.transform([f_fuzzy])
+                # Encode the search string into an NLP vector
+                query_vector = model.encode(f_fuzzy, convert_to_tensor=True)
                 
-                # Math matrix calculations for content similarity scoring
-                scores = cosine_similarity(query_vector, tfidf_matrix).flatten()
+                # Compute similarities against precalculated database embeddings
+                scores = util.cos_sim(query_vector, library_embeddings)[0].cpu().numpy()
                 
-                # Apply computed scores and filter by visibility overlap thresholds
+                # Apply filter and sort results based on scoring relevance (Threshold set to > 0.20)
                 f_df['search_score'] = scores
-                f_df = f_df[f_df['search_score'] > 0.03].sort_values(by='search_score', ascending=False)
+                f_df = f_df[f_df['search_score'] > 0.20].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
                 st.sidebar.error(f"AI search fault, structural fallback executed: {ai_err}")
                 f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
 
-    # Preserve remaining sequential logic processing configurations
+    # Keep traditional metadata filters matching after the NLP sweep
     if f_title: f_df = f_df[f_df.iloc[:, idx['title']].astype(str).str.contains(f_title, case=False)]
     if f_author: f_df = f_df[f_df.iloc[:, idx['author']].astype(str).str.contains(f_author, case=False)]
     if f_fnf != "All": f_df = f_df[f_df.iloc[:, idx['fnf']] == f_fnf]
@@ -583,7 +581,7 @@ elif not df.empty:
         if f_df.empty:
             st.info("No matching books discovered. Try adjusting your query keywords or range limits.")
         else:
-            # 📄 PAGINATION CONFIGURATION
+            # Pagination configurations
             BOOKS_PER_PAGE = 12  
             
             if 'current_page' not in st.session_state:
@@ -592,16 +590,13 @@ elif not df.empty:
             total_books = len(f_df)
             total_pages = (total_books - 1) // BOOKS_PER_PAGE + 1
             
-            # Guardrail layout checking
             if st.session_state.current_page >= total_pages:
                 st.session_state.current_page = 0
 
-            # Slice dataset chunk
             start_idx = st.session_state.current_page * BOOKS_PER_PAGE
             end_idx = min(start_idx + BOOKS_PER_PAGE, total_books)
             page_chunk = f_df.iloc[start_idx:end_idx]
 
-            # Display the grid of books for the current page chunk
             cols = st.columns(3)
             for i, (orig_idx, row) in enumerate(page_chunk.iterrows()):
                 with cols[i % 3]:
@@ -609,7 +604,6 @@ elif not df.empty:
                     voted = t in st.session_state.voted
                     cover_img_link = row['_cover_url']
                     
-                    # FIX: Keep fallback block flat on one line to ensure text isn't treated as plain markdown code text
                     if cover_img_link:
                         cover_html = f'<img class="cover-img" src="{cover_img_link}">'
                     else:
@@ -643,22 +637,19 @@ elif not df.empty:
                     if cr.button("View Details", key=f"d_{orig_idx}", use_container_width=True):
                         st.session_state.bk_focus = orig_idx; st.rerun()
 
-            # --- NAVIGATION AND TEXT BOX ROW AT THE BOTTOM (FIXED WIDTH) ---
+            # --- Pagination Navigation Layout ---
             st.write("---")
             
-            # Isolated callback state functions to guarantee action routing
             def go_first(): st.session_state.current_page = 0
             def go_prev(): st.session_state.current_page -= 1
             def go_next(): st.session_state.current_page += 1
             def go_last(): st.session_state.current_page = total_pages - 1
             
-            # Optimized column spacing ratios to perfectly fit everything on one line
             nav_cols = st.columns([1, 1.2, 1, 1, 3.8, 1, 1])
             
             nav_cols[0].button("First", key="b_first", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_first)
             nav_cols[1].button("Previous", key="b_prev", use_container_width=True, disabled=(st.session_state.current_page == 0), on_click=go_prev)
             
-            # Text input without + and -
             with nav_cols[2]:
                 typed_val = st.text_input(
                     label="Go to page input",
@@ -667,7 +658,6 @@ elif not df.empty:
                     key="direct_page_box"
                 )
             
-            # Safely triggers changes with direct layout padding protection
             if nav_cols[3].button("Go", key="b_go", use_container_width=True):
                 if typed_val.isdigit():
                     parsed_val = int(typed_val)
