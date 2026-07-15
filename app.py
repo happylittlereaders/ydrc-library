@@ -550,8 +550,8 @@ elif not df.empty:
                 
                 # Apply computed semantic scores
                 f_df['search_score'] = scores
-                # Filter out completely unrelated books (similarity threshold 0.15 - 0.25 is typical for NLP)
-                f_df = f_df[f_df['search_score'] > 0.20].sort_values(by='search_score', ascending=False)
+                # Filter out completely unrelated books (optimized threshold of 0.12)
+                f_df = f_df[f_df['search_score'] > 0.12].sort_values(by='search_score', ascending=False)
             except Exception as ai_err:
                 st.sidebar.error(f"NLP search error: {ai_err}")
                 f_df = f_df[f_df.apply(lambda r: f_fuzzy.lower() in str(r.values).lower(), axis=1)]
